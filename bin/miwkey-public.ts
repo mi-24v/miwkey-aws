@@ -4,5 +4,12 @@ import {MiwkeyPublicStack} from '../lib/miwkey-public-stack';
 import {MiwkeyNetworkStack} from "../lib/miwkey-network";
 
 const app = new cdk.App();
-new MiwkeyNetworkStack(app, "MiwkeyNetworkStack");
-new MiwkeyPublicStack(app, 'MiwkeyPublicStack');
+
+const network = new MiwkeyNetworkStack(app, "MiwkeyNetworkStack");
+const miwkey = new MiwkeyPublicStack(app, 'MiwkeyPublicStack', {
+    mainVpc: network.miwkeyMainVpc,
+    mainSubnets: network.miwkeyMainSubnets,
+    defaultSG: network.miwkeyDefaultSG
+});
+
+miwkey.addDependency(network);

@@ -9,9 +9,13 @@ import {
     CfnVPCPeeringConnection,
     CommonNetworkAclEntryOptions,
     NetworkAcl,
+    Peer,
+    Port,
     RouterType,
+    SecurityGroup,
     Subnet,
-    TrafficDirection
+    TrafficDirection,
+    Vpc
 } from "aws-cdk-lib/aws-ec2";
 
 
@@ -89,11 +93,15 @@ const basicNetAclList: CommonNetworkAclEntryOptions[] = [
 ]
 
 export class MiwkeyNetworkStack extends Stack {
+    public readonly miwkeyMainVpc: Vpc
+    public readonly miwkeyDefaultSG: SecurityGroup
+    public readonly miwkeyMainSubnets: Subnet[]
+
     constructor(scope: Construct, id: string, props?: StackProps) {
         super(scope, id, props);
 
         const ipAddress: MiwkeyIp = require("./config/ipAddress.json")
-        const miwkeyMainVpc = new aws_ec2.Vpc(this, "miwkeyMainVPC", {
+        this.miwkeyMainVpc = new aws_ec2.Vpc(this, "miwkeyMainVPC", {
                 ipAddresses: aws_ec2.IpAddresses.cidr(ipAddress.vpcCIDR),
                 enableDnsHostnames: false,
                 enableDnsSupport: true,
@@ -102,19 +110,20 @@ export class MiwkeyNetworkStack extends Stack {
                 subnetConfiguration: [],
             }
         )
-        miwkeyMainVpc.applyRemovalPolicy(RemovalPolicy.RETAIN)
-        const miwkeyMainSubnets: readonly Subnet[] = ipAddress.subnetCIDRs.map((s, index) => {
+        this.miwkeyMainVpc.applyRemovalPolicy(RemovalPolicy.RETAIN)
+        this.miwkeyMainSubnets = ipAddress.subnetCIDRs.map((s, index) => {
             return new Subnet(this, `miwkey-subnet-${index}`, {
                 availabilityZone: s.region,
                 cidrBlock: s.ip,
-                vpcId: miwkeyMainVpc.vpcId
+                vpcId: this.miwkeyMainVpc.vpcId,
+                mapPublicIpOnLaunch: true // public subnet扱いにさせるため必要
             })
         })
 
         const miwkeyMainIGW = new CfnInternetGateway(this, "igw-main")
         miwkeyMainIGW.applyRemovalPolicy(RemovalPolicy.RETAIN)
         const miwkeyNetworkAcl = new NetworkAcl(this, "miwkey-net-acl", {
-            vpc: miwkeyMainVpc
+            vpc: this.miwkeyMainVpc
         })
         const netAclList: CommonNetworkAclEntryOptions[] = basicNetAclList.concat([
             {// inside vpc
@@ -135,9 +144,9 @@ export class MiwkeyNetworkStack extends Stack {
             })
         }
         netAclList.forEach(
-            a => miwkeyNetworkAcl.addEntry(`miwkey-${a.ruleNumber}-${a.direction??""}`, a)
+            a => miwkeyNetworkAcl.addEntry(`miwkey-${a.ruleNumber}-${a.direction ?? ""}`, a)
         )
-        miwkeyMainSubnets.forEach(subnet => {
+        this.miwkeyMainSubnets.forEach(subnet => {
             subnet.applyRemovalPolicy(RemovalPolicy.RETAIN)
             subnet.addDefaultInternetRoute(miwkeyMainIGW.attrInternetGatewayId, miwkeyMainIGW)
             subnet.associateNetworkAcl(`net-acl-${subnet.toString()}`, miwkeyNetworkAcl)
@@ -145,10 +154,10 @@ export class MiwkeyNetworkStack extends Stack {
         if (ipAddress.peerVpcId !== undefined) {
             const SubVpcToMainVpcPeer = new CfnVPCPeeringConnection(this, "pcx-main-sub", {
                 peerVpcId: ipAddress.peerVpcId,
-                vpcId: miwkeyMainVpc.vpcId
+                vpcId: this.miwkeyMainVpc.vpcId
             })
             SubVpcToMainVpcPeer.applyRemovalPolicy(RemovalPolicy.RETAIN)
-            miwkeyMainSubnets.forEach(subnet => {
+            this.miwkeyMainSubnets.forEach(subnet => {
                 subnet.addRoute("sub_vpc_peer", {
                     routerId: SubVpcToMainVpcPeer.attrId,
                     routerType: RouterType.VPC_PEERING_CONNECTION,
@@ -156,5 +165,15 @@ export class MiwkeyNetworkStack extends Stack {
                 })
             })
         }
+
+        this.miwkeyDefaultSG = new SecurityGroup(this, "miwkeyDefaultSG", {
+            vpc: this.miwkeyMainVpc,
+            allowAllOutbound: true
+        })
+        this.miwkeyDefaultSG.addIngressRule(
+            Peer.ipv4(this.miwkeyMainVpc.vpcCidrBlock),
+            Port.allTraffic(),
+            "inside vpc"
+        )
     }
 }
