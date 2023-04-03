@@ -7,6 +7,9 @@ import {MiwkeyPublicStackProps} from "./types/stackprops";
 import {FileSystem} from "aws-cdk-lib/aws-efs";
 import {configFSPolicy} from "./iam-policies";
 import {CfnCacheCluster} from "aws-cdk-lib/aws-elasticache";
+import {DatabaseInstance, DatabaseInstanceEngine, StorageType} from "aws-cdk-lib/aws-rds";
+import {InstanceClass, InstanceSize, InstanceType} from "aws-cdk-lib/aws-ec2";
+import {generateUsername} from "unique-username-generator";
 
 export class MiwkeyPublicStack extends Stack {
     constructor(scope: Construct, id: string, props: MiwkeyPublicStackProps) {
@@ -44,10 +47,36 @@ export class MiwkeyPublicStack extends Stack {
             azMode: "single-az",
             cacheSubnetGroupName: queueSubnetGroup.cacheSubnetGroupName,
             engineVersion: "6.2",
-            preferredMaintenanceWindow: "tue:19:00-tue:22:00", // 04:00JST-07:00JST
+            preferredMaintenanceWindow: "tue:19:00-tue:22:00", // wed 04:00JST-07:00JST
             snapshotRetentionLimit: 5,
             vpcSecurityGroupIds: [props.defaultSG.securityGroupId]
         })
         postQueue.node.addDependency(queueSubnetGroup)
+
+        const mainDatabase = new DatabaseInstance(this, "miwkeyMainDB", {
+            engine: DatabaseInstanceEngine.POSTGRES,
+            vpc: props.mainVpc,
+            allocatedStorage: 50, // GiB
+            allowMajorVersionUpgrade: false,
+            autoMinorVersionUpgrade: true,
+            backupRetention: Duration.days(7),
+            credentials: {
+                username: generateUsername()
+            },
+            deletionProtection: true,
+            enablePerformanceInsights: true,
+            iamAuthentication: true,
+            instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL),
+            monitoringInterval: Duration.seconds(60),
+            preferredBackupWindow: "tue:18:00-tue:19:00", // wed 03:00-04:00JST
+            preferredMaintenanceWindow: "tue:23:00-tue:24:00", // wed 08:00-09:00JST
+            publiclyAccessible: false,
+            storageEncrypted: true,
+            securityGroups: [props.defaultSG],
+            storageType: StorageType.GP3,
+            vpcSubnets: {
+                subnets: props.mainSubnets
+            }
+        });
     }
 }
