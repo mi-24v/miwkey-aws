@@ -1,4 +1,4 @@
-import {aws_elasticache, Duration, RemovalPolicy, Stack} from 'aws-cdk-lib';
+import {aws_elasticache, CfnParameter, Duration, RemovalPolicy, Stack} from 'aws-cdk-lib';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as subs from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
@@ -9,11 +9,16 @@ import {configFSPolicy} from "./iam-policies";
 import {CfnCacheCluster} from "aws-cdk-lib/aws-elasticache";
 import {DatabaseInstance, DatabaseInstanceEngine, StorageType} from "aws-cdk-lib/aws-rds";
 import {InstanceClass, InstanceSize, InstanceType} from "aws-cdk-lib/aws-ec2";
-import {generateUsername} from "unique-username-generator";
+import {ApplicationLoadBalancedEc2Service} from "aws-cdk-lib/aws-ecs-patterns";
+import {Cluster} from "aws-cdk-lib/aws-ecs";
 
 export class MiwkeyPublicStack extends Stack {
     constructor(scope: Construct, id: string, props: MiwkeyPublicStackProps) {
         super(scope, id, props);
+        const databaseUsername = new CfnParameter(this, "rdsUsername", {
+            type: "String",
+            default: "postgres"
+        })
 
         const queue = new sqs.Queue(this, 'MiwkeyPublicQueue', {
             visibilityTimeout: Duration.seconds(300)
@@ -61,7 +66,7 @@ export class MiwkeyPublicStack extends Stack {
             autoMinorVersionUpgrade: true,
             backupRetention: Duration.days(7),
             credentials: {
-                username: generateUsername()
+                username: databaseUsername.valueAsString
             },
             deletionProtection: true,
             enablePerformanceInsights: true,
