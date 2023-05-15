@@ -1,6 +1,5 @@
-import {aws_ec2, RemovalPolicy, Stack, StackProps} from "aws-cdk-lib";
+import {aws_ec2, RemovalPolicy, Stack} from "aws-cdk-lib";
 import {Construct} from "constructs";
-import {MiwkeyIp} from "./types/miwkey-ip";
 import {
     AclCidr,
     AclTraffic,
@@ -17,6 +16,8 @@ import {
     TrafficDirection,
     Vpc
 } from "aws-cdk-lib/aws-ec2";
+import {Certificate, ICertificate} from "aws-cdk-lib/aws-certificatemanager";
+import {MiwkeyNetworkStackProps} from "./types/stackprops";
 
 
 const basicNetAclList: CommonNetworkAclEntryOptions[] = [
@@ -96,13 +97,13 @@ export class MiwkeyNetworkStack extends Stack {
     public readonly miwkeyMainVpc: Vpc
     public readonly miwkeyDefaultSG: SecurityGroup
     public readonly miwkeyMainSubnets: Subnet[]
+    public readonly miwkeyDomainCertificate: ICertificate
 
-    constructor(scope: Construct, id: string, props?: StackProps) {
+    constructor(scope: Construct, id: string, props: MiwkeyNetworkStackProps) {
         super(scope, id, props);
 
-        const ipAddress: MiwkeyIp = require("./config/ipAddress.json")
         this.miwkeyMainVpc = new aws_ec2.Vpc(this, "miwkeyMainVPC", {
-                ipAddresses: aws_ec2.IpAddresses.cidr(ipAddress.vpcCIDR),
+                ipAddresses: aws_ec2.IpAddresses.cidr(props.ipAddresses.vpcCIDR),
                 enableDnsHostnames: false,
                 enableDnsSupport: true,
                 natGateways: 0,
@@ -111,7 +112,7 @@ export class MiwkeyNetworkStack extends Stack {
             }
         )
         this.miwkeyMainVpc.applyRemovalPolicy(RemovalPolicy.RETAIN)
-        this.miwkeyMainSubnets = ipAddress.subnetCIDRs.map((s, index) => {
+        this.miwkeyMainSubnets = props.ipAddresses.subnetCIDRs.map((s, index) => {
             return new Subnet(this, `miwkey-subnet-${index}`, {
                 availabilityZone: s.region,
                 cidrBlock: s.ip,
@@ -127,16 +128,16 @@ export class MiwkeyNetworkStack extends Stack {
         })
         const netAclList: CommonNetworkAclEntryOptions[] = basicNetAclList.concat([
             {// inside vpc
-                cidr: AclCidr.ipv4(ipAddress.vpcCIDR),
+                cidr: AclCidr.ipv4(props.ipAddresses.vpcCIDR),
                 ruleNumber: 1,
                 traffic: AclTraffic.allTraffic(),
                 direction: TrafficDirection.INGRESS,
                 ruleAction: Action.ALLOW
             },
         ])
-        if (ipAddress.peerDestCIDR !== undefined) {
+        if (props.ipAddresses.peerDestCIDR !== undefined) {
             basicNetAclList.push({
-                cidr: AclCidr.ipv4(ipAddress.peerDestCIDR),
+                cidr: AclCidr.ipv4(props.ipAddresses.peerDestCIDR),
                 ruleNumber: 2,
                 traffic: AclTraffic.allTraffic(),
                 direction: TrafficDirection.INGRESS,
@@ -151,9 +152,9 @@ export class MiwkeyNetworkStack extends Stack {
             subnet.addDefaultInternetRoute(miwkeyMainIGW.attrInternetGatewayId, miwkeyMainIGW)
             subnet.associateNetworkAcl(`net-acl-${subnet.toString()}`, miwkeyNetworkAcl)
         })
-        if (ipAddress.peerVpcId !== undefined) {
+        if (props.ipAddresses.peerVpcId !== undefined) {
             const SubVpcToMainVpcPeer = new CfnVPCPeeringConnection(this, "pcx-main-sub", {
-                peerVpcId: ipAddress.peerVpcId,
+                peerVpcId: props.ipAddresses.peerVpcId,
                 vpcId: this.miwkeyMainVpc.vpcId
             })
             SubVpcToMainVpcPeer.applyRemovalPolicy(RemovalPolicy.RETAIN)
@@ -161,7 +162,7 @@ export class MiwkeyNetworkStack extends Stack {
                 subnet.addRoute("sub_vpc_peer", {
                     routerId: SubVpcToMainVpcPeer.attrId,
                     routerType: RouterType.VPC_PEERING_CONNECTION,
-                    destinationCidrBlock: ipAddress.peerDestCIDR
+                    destinationCidrBlock: props.ipAddresses.peerDestCIDR
                 })
             })
         }
@@ -175,5 +176,7 @@ export class MiwkeyNetworkStack extends Stack {
             Port.allTraffic(),
             "inside vpc"
         )
+
+        this.miwkeyDomainCertificate = Certificate.fromCertificateArn(this, "miwkeyDomainCertificate", props.certificateArn)
     }
 }
