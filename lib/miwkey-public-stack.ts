@@ -77,8 +77,8 @@ export class MiwkeyPublicStack extends Stack {
             iamAuthentication: true,
             instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL),
             monitoringInterval: Duration.seconds(60),
-            preferredBackupWindow: "tue:18:00-tue:19:00", // wed 03:00-04:00JST
-            preferredMaintenanceWindow: "tue:23:00-tue:24:00", // wed 08:00-09:00JST
+            preferredBackupWindow: "18:00-19:00", // 03:00-04:00JST
+            preferredMaintenanceWindow: "tue:23:00-wed:00:00", // wed 08:00-09:00JST
             publiclyAccessible: false,
             storageEncrypted: true,
             securityGroups: [props.defaultSG],
