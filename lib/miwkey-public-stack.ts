@@ -10,8 +10,9 @@ import {CfnCacheCluster} from "aws-cdk-lib/aws-elasticache";
 import {DatabaseInstance, DatabaseInstanceEngine, StorageType} from "aws-cdk-lib/aws-rds";
 import {InstanceClass, InstanceSize, InstanceType, SubnetSelection} from "aws-cdk-lib/aws-ec2";
 import {ApplicationLoadBalancedEc2Service} from "aws-cdk-lib/aws-ecs-patterns";
-import {Cluster} from "aws-cdk-lib/aws-ecs";
+import {AddCapacityOptions, Cluster, ContainerDependencyCondition} from "aws-cdk-lib/aws-ecs";
 import {ApplicationLoadBalancer} from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import {miwkeyConfigMountPoint, miwkeyMainTaskDefinition, miwkeyMigrationTaskDefinition} from "./taskdef";
 
 export class MiwkeyPublicStack extends Stack {
     constructor(scope: Construct, id: string, props: MiwkeyPublicStackProps) {
@@ -85,19 +86,55 @@ export class MiwkeyPublicStack extends Stack {
             vpcSubnets: subnetSelection
         });
 
+        const ec2AutoScalingGroup: AddCapacityOptions = {
+            instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL),
+            capacityRebalance: true,
+            desiredCapacity: 2,
+            maxCapacity: 4,
+            spotPrice: "0.01", // 7.2usd/mo
+            ssmSessionPermissions: true,
+            vpcSubnets: subnetSelection
+        }
         const mainService = new ApplicationLoadBalancedEc2Service(this, "miwkeyMainService", {
+            capacityProviderStrategies: [
+                {
+                    capacityProvider: "default",
+                    base: 1,
+                    weight: 200
+                }
+            ],
             cluster: new Cluster(this, "miwkeyEcsCluster", {
+                capacity: ec2AutoScalingGroup,
                 containerInsights: true,
                 vpc: props.mainVpc
             }),
             certificate: props.domainCertificate,
+            cpu: 1024,
+            memoryReservationMiB: 1100,
             enableECSManagedTags: true,
             enableExecuteCommand: true,
             loadBalancer: new ApplicationLoadBalancer(this, "miwkeyMainLB", {
                 vpc: props.mainVpc,
                 vpcSubnets: subnetSelection,
                 securityGroup: props.loadBalancerSG
-            })
+            }),
+            openListener: false,
+            taskImageOptions: miwkeyMainTaskDefinition()
         });
+        const volumeName = "misskey-config"
+        mainService.taskDefinition.addVolume({
+            name: volumeName,
+            efsVolumeConfiguration: {
+                fileSystemId: configFs.fileSystemId,
+                transitEncryption: "ENABLED"
+            }
+        })
+        const migration = mainService.taskDefinition.addContainer("miwkeyMigrationContainer", miwkeyMigrationTaskDefinition())
+        migration.addMountPoints(miwkeyConfigMountPoint(volumeName))
+        mainService.taskDefinition.defaultContainer?.addMountPoints(miwkeyConfigMountPoint(volumeName))
+        mainService.taskDefinition.defaultContainer?.addContainerDependencies({
+            container: migration,
+            condition: ContainerDependencyCondition.SUCCESS
+        })
     }
 }
