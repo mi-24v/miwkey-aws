@@ -14,6 +14,7 @@ const miwkey = new MiwkeyPublicStack(app, 'MiwkeyPublicStack', {
     mainVpc: network.miwkeyMainVpc,
     mainSubnets: network.miwkeyMainSubnets,
     defaultSG: network.miwkeyDefaultSG,
+    loadBalancerSG: network.miwkeyLoadBalancerSG,
     domainCertificate: network.miwkeyDomainCertificate
 });
 

@@ -7,7 +7,8 @@ import {MiwkeyIp} from "./miwkey-ip";
 export interface MiwkeyPublicStackProps extends StackProps{
     mainVpc: Vpc,
     mainSubnets: Subnet[]
-    defaultSG: SecurityGroup
+    defaultSG: SecurityGroup,
+    loadBalancerSG: SecurityGroup,
     domainCertificate: ICertificate
 }
 

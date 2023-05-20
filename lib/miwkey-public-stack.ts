@@ -8,9 +8,10 @@ import {FileSystem} from "aws-cdk-lib/aws-efs";
 import {configFSPolicy} from "./iam-policies";
 import {CfnCacheCluster} from "aws-cdk-lib/aws-elasticache";
 import {DatabaseInstance, DatabaseInstanceEngine, StorageType} from "aws-cdk-lib/aws-rds";
-import {InstanceClass, InstanceSize, InstanceType} from "aws-cdk-lib/aws-ec2";
+import {InstanceClass, InstanceSize, InstanceType, SubnetSelection} from "aws-cdk-lib/aws-ec2";
 import {ApplicationLoadBalancedEc2Service} from "aws-cdk-lib/aws-ecs-patterns";
 import {Cluster} from "aws-cdk-lib/aws-ecs";
+import {ApplicationLoadBalancer} from "aws-cdk-lib/aws-elasticloadbalancingv2";
 
 export class MiwkeyPublicStack extends Stack {
     constructor(scope: Construct, id: string, props: MiwkeyPublicStackProps) {
@@ -19,6 +20,10 @@ export class MiwkeyPublicStack extends Stack {
             type: "String",
             default: "postgres"
         })
+        const subnetSelection: SubnetSelection = {
+            // 自前でIGW張ってるとpublic subnetがないと言われて自動指定できないので直接指定する
+            subnets: props.mainSubnets
+        }
 
         const queue = new sqs.Queue(this, 'MiwkeyPublicQueue', {
             visibilityTimeout: Duration.seconds(300)
@@ -30,9 +35,7 @@ export class MiwkeyPublicStack extends Stack {
 
         const configFs = new FileSystem(this, "miwkeyConfigFs", {
             vpc: props.mainVpc,
-            vpcSubnets: {
-                subnets: props.mainSubnets
-            },
+            vpcSubnets: subnetSelection,
             encrypted: true,
             fileSystemPolicy: configFSPolicy,
             securityGroup: props.defaultSG,
@@ -79,9 +82,22 @@ export class MiwkeyPublicStack extends Stack {
             storageEncrypted: true,
             securityGroups: [props.defaultSG],
             storageType: StorageType.GP3,
-            vpcSubnets: {
-                subnets: props.mainSubnets
-            }
+            vpcSubnets: subnetSelection
+        });
+
+        const mainService = new ApplicationLoadBalancedEc2Service(this, "miwkeyMainService", {
+            cluster: new Cluster(this, "miwkeyEcsCluster", {
+                containerInsights: true,
+                vpc: props.mainVpc
+            }),
+            certificate: props.domainCertificate,
+            enableECSManagedTags: true,
+            enableExecuteCommand: true,
+            loadBalancer: new ApplicationLoadBalancer(this, "miwkeyMainLB", {
+                vpc: props.mainVpc,
+                vpcSubnets: subnetSelection,
+                securityGroup: props.loadBalancerSG
+            })
         });
     }
 }

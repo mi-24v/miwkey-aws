@@ -18,6 +18,7 @@ import {
 } from "aws-cdk-lib/aws-ec2";
 import {Certificate, ICertificate} from "aws-cdk-lib/aws-certificatemanager";
 import {MiwkeyNetworkStackProps} from "./types/stackprops";
+import {OnlyCloudflareIngressRules} from "./security";
 
 
 const basicNetAclList: CommonNetworkAclEntryOptions[] = [
@@ -96,6 +97,7 @@ const basicNetAclList: CommonNetworkAclEntryOptions[] = [
 export class MiwkeyNetworkStack extends Stack {
     public readonly miwkeyMainVpc: Vpc
     public readonly miwkeyDefaultSG: SecurityGroup
+    public readonly miwkeyLoadBalancerSG: SecurityGroup
     public readonly miwkeyMainSubnets: Subnet[]
     public readonly miwkeyDomainCertificate: ICertificate
 
@@ -176,6 +178,18 @@ export class MiwkeyNetworkStack extends Stack {
             Port.allTraffic(),
             "inside vpc"
         )
+
+        this.miwkeyLoadBalancerSG = new SecurityGroup(this, "miwkeyLoadBalancerSG", {
+            vpc: this.miwkeyMainVpc,
+            allowAllOutbound: true
+        })
+        OnlyCloudflareIngressRules.forEach(rule => {
+            this.miwkeyLoadBalancerSG.addIngressRule(
+                rule.peer,
+                rule.connection
+            )
+        })
+
 
         this.miwkeyDomainCertificate = Certificate.fromCertificateArn(this, "miwkeyDomainCertificate", props.certificateArn)
     }
