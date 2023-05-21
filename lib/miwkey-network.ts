@@ -106,7 +106,7 @@ export class MiwkeyNetworkStack extends Stack {
 
         this.miwkeyMainVpc = new aws_ec2.Vpc(this, "miwkeyMainVPC", {
                 ipAddresses: aws_ec2.IpAddresses.cidr(props.ipAddresses.vpcCIDR),
-                enableDnsHostnames: false,
+                enableDnsHostnames: true,
                 enableDnsSupport: true,
                 natGateways: 0,
                 vpcName: "miwkey-main",
@@ -138,7 +138,7 @@ export class MiwkeyNetworkStack extends Stack {
             },
         ])
         if (props.ipAddresses.peerDestCIDR !== undefined) {
-            basicNetAclList.push({
+            netAclList.push({
                 cidr: AclCidr.ipv4(props.ipAddresses.peerDestCIDR),
                 ruleNumber: 2,
                 traffic: AclTraffic.allTraffic(),
@@ -154,7 +154,18 @@ export class MiwkeyNetworkStack extends Stack {
             subnet.addDefaultInternetRoute(miwkeyMainIGW.attrInternetGatewayId, miwkeyMainIGW)
             subnet.associateNetworkAcl(`net-acl-${subnet.toString()}`, miwkeyNetworkAcl)
         })
-        if (props.ipAddresses.peerVpcId !== undefined) {
+
+        this.miwkeyDefaultSG = new SecurityGroup(this, "miwkeyDefaultSG", {
+            vpc: this.miwkeyMainVpc,
+            allowAllOutbound: true
+        })
+        this.miwkeyDefaultSG.addIngressRule(
+            Peer.ipv4(this.miwkeyMainVpc.vpcCidrBlock),
+            Port.allTraffic(),
+            "inside vpc"
+        )
+
+        if (props.ipAddresses.peerVpcId !== undefined && props.ipAddresses.peerDestCIDR !== undefined) {
             const SubVpcToMainVpcPeer = new CfnVPCPeeringConnection(this, "pcx-main-sub", {
                 peerVpcId: props.ipAddresses.peerVpcId,
                 vpcId: this.miwkeyMainVpc.vpcId
@@ -167,17 +178,11 @@ export class MiwkeyNetworkStack extends Stack {
                     destinationCidrBlock: props.ipAddresses.peerDestCIDR
                 })
             })
+            this.miwkeyDefaultSG.addIngressRule(
+                Peer.ipv4(props.ipAddresses.peerDestCIDR),
+                Port.allTraffic()
+            )
         }
-
-        this.miwkeyDefaultSG = new SecurityGroup(this, "miwkeyDefaultSG", {
-            vpc: this.miwkeyMainVpc,
-            allowAllOutbound: true
-        })
-        this.miwkeyDefaultSG.addIngressRule(
-            Peer.ipv4(this.miwkeyMainVpc.vpcCidrBlock),
-            Port.allTraffic(),
-            "inside vpc"
-        )
 
         this.miwkeyLoadBalancerSG = new SecurityGroup(this, "miwkeyLoadBalancerSG", {
             vpc: this.miwkeyMainVpc,
