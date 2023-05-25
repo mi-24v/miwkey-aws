@@ -68,7 +68,7 @@ export class MiwkeyPublicStack extends Stack {
             }),
             vpc: props.mainVpc,
             allocatedStorage: 50, // GiB
-            allowMajorVersionUpgrade: true,
+            allowMajorVersionUpgrade: false,
             autoMinorVersionUpgrade: true,
             backupRetention: Duration.days(7),
             credentials: {
