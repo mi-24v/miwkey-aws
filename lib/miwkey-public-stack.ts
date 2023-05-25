@@ -7,7 +7,7 @@ import {MiwkeyPublicStackProps} from "./types/stackprops";
 import {FileSystem} from "aws-cdk-lib/aws-efs";
 import {configFSPolicy} from "./iam-policies";
 import {CfnCacheCluster} from "aws-cdk-lib/aws-elasticache";
-import {DatabaseInstance, DatabaseInstanceEngine, StorageType} from "aws-cdk-lib/aws-rds";
+import {DatabaseInstance, DatabaseInstanceEngine, PostgresEngineVersion, StorageType} from "aws-cdk-lib/aws-rds";
 import {InstanceClass, InstanceSize, InstanceType, SubnetSelection} from "aws-cdk-lib/aws-ec2";
 import {ApplicationLoadBalancedEc2Service} from "aws-cdk-lib/aws-ecs-patterns";
 import {AddCapacityOptions, Cluster, ContainerDependencyCondition} from "aws-cdk-lib/aws-ecs";
@@ -63,10 +63,12 @@ export class MiwkeyPublicStack extends Stack {
         postQueue.node.addDependency(queueSubnetGroup)
 
         const mainDatabase = new DatabaseInstance(this, "miwkeyMainDB", {
-            engine: DatabaseInstanceEngine.POSTGRES,
+            engine: DatabaseInstanceEngine.postgres({
+                version: PostgresEngineVersion.of("15.2", "15")
+            }),
             vpc: props.mainVpc,
             allocatedStorage: 50, // GiB
-            allowMajorVersionUpgrade: false,
+            allowMajorVersionUpgrade: true,
             autoMinorVersionUpgrade: true,
             backupRetention: Duration.days(7),
             credentials: {
