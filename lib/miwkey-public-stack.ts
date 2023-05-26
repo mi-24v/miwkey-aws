@@ -10,9 +10,16 @@ import {CfnCacheCluster} from "aws-cdk-lib/aws-elasticache";
 import {DatabaseInstance, DatabaseInstanceEngine, PostgresEngineVersion, StorageType} from "aws-cdk-lib/aws-rds";
 import {InstanceClass, InstanceSize, InstanceType, SubnetSelection} from "aws-cdk-lib/aws-ec2";
 import {ApplicationLoadBalancedEc2Service} from "aws-cdk-lib/aws-ecs-patterns";
-import {AddCapacityOptions, Cluster, ContainerDependencyCondition} from "aws-cdk-lib/aws-ecs";
+import {
+    AmiHardwareType,
+    AsgCapacityProvider,
+    Cluster,
+    ContainerDependencyCondition,
+    EcsOptimizedImage
+} from "aws-cdk-lib/aws-ecs";
 import {ApplicationLoadBalancer} from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import {miwkeyConfigMountPoint, miwkeyMainTaskDefinition, miwkeyMigrationTaskDefinition} from "./taskdef";
+import {AutoScalingGroup} from "aws-cdk-lib/aws-autoscaling";
 
 export class MiwkeyPublicStack extends Stack {
     constructor(scope: Construct, id: string, props: MiwkeyPublicStackProps) {
@@ -88,28 +95,41 @@ export class MiwkeyPublicStack extends Stack {
             vpcSubnets: subnetSelection
         });
 
-        const ec2AutoScalingGroup: AddCapacityOptions = {
-            instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL),
-            capacityRebalance: true,
-            desiredCapacity: 2,
-            maxCapacity: 4,
-            spotPrice: "0.01", // 7.2usd/mo
-            ssmSessionPermissions: true,
-            vpcSubnets: subnetSelection
-        }
+
+        const miwkeyMainCluster = new Cluster(this, "miwkeyEcsCluster", {
+            containerInsights: true,
+            vpc: props.mainVpc
+        });
+        const miwkeyMainAsgCapacityProvider = new AsgCapacityProvider(this, "miwkeyAsgCapacityProvider", {
+            autoScalingGroup: new AutoScalingGroup(this, "miwkeyASG", {
+                instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL),
+                capacityRebalance: true,
+                desiredCapacity: 2,
+                maxCapacity: 4,
+                machineImage: EcsOptimizedImage.amazonLinux2(AmiHardwareType.ARM),
+                securityGroup: props.defaultSG,
+                spotPrice: "0.01", // 7.2usd/mo
+                ssmSessionPermissions: true,
+                vpcSubnets: subnetSelection,
+                vpc: props.mainVpc
+            }),
+            enableManagedScaling: true,
+            enableManagedTerminationProtection: true
+        });
+        miwkeyMainCluster.addAsgCapacityProvider(
+            miwkeyMainAsgCapacityProvider, {
+                spotInstanceDraining: true
+            }
+        );
         const mainService = new ApplicationLoadBalancedEc2Service(this, "miwkeyMainService", {
             capacityProviderStrategies: [
                 {
-                    capacityProvider: "default",
+                    capacityProvider: miwkeyMainAsgCapacityProvider.capacityProviderName,
                     base: 1,
                     weight: 200
                 }
             ],
-            cluster: new Cluster(this, "miwkeyEcsCluster", {
-                capacity: ec2AutoScalingGroup,
-                containerInsights: true,
-                vpc: props.mainVpc
-            }),
+            cluster: miwkeyMainCluster,
             certificate: props.domainCertificate,
             cpu: 1024,
             memoryReservationMiB: 1100,
@@ -121,6 +141,7 @@ export class MiwkeyPublicStack extends Stack {
                 securityGroup: props.loadBalancerSG
             }),
             openListener: false,
+            redirectHTTP: true,
             taskImageOptions: miwkeyMainTaskDefinition()
         });
         const volumeName = "misskey-config"
