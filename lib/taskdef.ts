@@ -2,7 +2,7 @@ import {ApplicationLoadBalancedTaskImageOptions} from "aws-cdk-lib/aws-ecs-patte
 import {ContainerDefinitionOptions, ContainerImage, MountPoint} from "aws-cdk-lib/aws-ecs";
 
 
-const imageTag = "4d04a48b"
+const imageTag = "4d04a48b-arm64"
 const imageRepoUrl = "docker.io/miwpayou0808/misskey"
 
 export function miwkeyMainTaskDefinition(): ApplicationLoadBalancedTaskImageOptions {
