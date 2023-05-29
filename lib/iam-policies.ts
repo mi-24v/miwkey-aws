@@ -29,3 +29,13 @@ export const configFSPolicy: PolicyDocument = new PolicyDocument({
     ]
 })
 
+export function miwkeyECSTaskRolePolicy(taskEFSArn: string): PolicyStatement {
+    return new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: [
+            "elasticfilesystem:ClientMount",
+            "elasticfilesystem:ClientRootAccess"
+        ],
+        resources: [taskEFSArn]
+    })
+}

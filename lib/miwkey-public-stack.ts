@@ -5,7 +5,7 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import {Construct} from 'constructs';
 import {MiwkeyPublicStackProps} from "./types/stackprops";
 import {FileSystem} from "aws-cdk-lib/aws-efs";
-import {configFSPolicy} from "./iam-policies";
+import {configFSPolicy, miwkeyECSTaskRolePolicy} from "./iam-policies";
 import {CfnCacheCluster} from "aws-cdk-lib/aws-elasticache";
 import {DatabaseInstance, DatabaseInstanceEngine, PostgresEngineVersion, StorageType} from "aws-cdk-lib/aws-rds";
 import {InstanceClass, InstanceSize, InstanceType, SubnetSelection} from "aws-cdk-lib/aws-ec2";
@@ -151,7 +151,8 @@ export class MiwkeyPublicStack extends Stack {
             name: volumeName,
             efsVolumeConfiguration: {
                 fileSystemId: configFs.fileSystemId,
-                transitEncryption: "ENABLED"
+                transitEncryption: "ENABLED",
+                authorizationConfig: {iam: "ENABLED"}
             }
         })
         const migration = mainService.taskDefinition.addContainer("miwkeyMigrationContainer", miwkeyMigrationTaskDefinition())
@@ -161,5 +162,8 @@ export class MiwkeyPublicStack extends Stack {
             container: migration,
             condition: ContainerDependencyCondition.SUCCESS
         })
+        mainService.taskDefinition.addToTaskRolePolicy(miwkeyECSTaskRolePolicy(configFs.fileSystemArn));
+
+        mainService.node.addDependency(mainDatabase, postQueue);
     }
 }
