@@ -104,8 +104,6 @@ export class MiwkeyPublicStack extends Stack {
             autoScalingGroup: new AutoScalingGroup(this, "miwkeyASG", {
                 instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL),
                 capacityRebalance: true,
-                desiredCapacity: 2,
-                maxCapacity: 4,
                 machineImage: EcsOptimizedImage.amazonLinux2(AmiHardwareType.ARM),
                 securityGroup: props.defaultSG,
                 spotPrice: "0.01", // 7.2usd/mo
@@ -126,15 +124,19 @@ export class MiwkeyPublicStack extends Stack {
                 {
                     capacityProvider: miwkeyMainAsgCapacityProvider.capacityProviderName,
                     base: 1,
-                    weight: 200
+                    weight: 1
                 }
             ],
             cluster: miwkeyMainCluster,
             certificate: props.domainCertificate,
+            circuitBreaker: {
+                rollback: true
+            },
             cpu: 1024,
+            desiredCount: 2,
             memoryReservationMiB: 1100,
             enableECSManagedTags: true,
-            enableExecuteCommand: true,
+            enableExecuteCommand: false,
             loadBalancer: new ApplicationLoadBalancer(this, "miwkeyMainLB", {
                 vpc: props.mainVpc,
                 vpcSubnets: subnetSelection,

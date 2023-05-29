@@ -1,5 +1,6 @@
 import {ApplicationLoadBalancedTaskImageOptions} from "aws-cdk-lib/aws-ecs-patterns";
-import {ContainerDefinitionOptions, ContainerImage, MountPoint} from "aws-cdk-lib/aws-ecs";
+import {ContainerDefinitionOptions, ContainerImage, LogDriver, MountPoint} from "aws-cdk-lib/aws-ecs";
+import {RetentionDays} from "aws-cdk-lib/aws-logs";
 
 
 const imageTag = "4d04a48b-arm64"
@@ -19,7 +20,11 @@ export function miwkeyMigrationTaskDefinition(): ContainerDefinitionOptions {
         image: ContainerImage.fromRegistry(`${imageRepoUrl}:${imageTag}`),
         command: ["npm", "run", "migrate"],
         essential: false,
-        memoryReservationMiB: 1024,
+        logging: LogDriver.awsLogs({
+            streamPrefix: "miwkey",
+            logRetention: RetentionDays.INFINITE
+        }),
+        memoryReservationMiB: 512,
         workingDirectory: "/misskey"
     }
 }
