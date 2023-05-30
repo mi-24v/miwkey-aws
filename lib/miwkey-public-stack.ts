@@ -15,7 +15,8 @@ import {
     AsgCapacityProvider,
     Cluster,
     ContainerDependencyCondition,
-    EcsOptimizedImage
+    EcsOptimizedImage,
+    PlacementStrategy
 } from "aws-cdk-lib/aws-ecs";
 import {ApplicationLoadBalancer} from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import {miwkeyConfigMountPoint, miwkeyMainTaskDefinition, miwkeyMigrationTaskDefinition} from "./taskdef";
@@ -143,6 +144,9 @@ export class MiwkeyPublicStack extends Stack {
                 securityGroup: props.loadBalancerSG
             }),
             openListener: false,
+            placementStrategies: [
+                PlacementStrategy.spreadAcrossInstances()
+            ],
             redirectHTTP: true,
             taskImageOptions: miwkeyMainTaskDefinition()
         });
