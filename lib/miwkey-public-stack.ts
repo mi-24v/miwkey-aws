@@ -141,6 +141,7 @@ export class MiwkeyPublicStack extends Stack {
             loadBalancer: new ApplicationLoadBalancer(this, "miwkeyMainLB", {
                 vpc: props.mainVpc,
                 vpcSubnets: subnetSelection,
+                internetFacing: true,
                 securityGroup: props.loadBalancerSG
             }),
             openListener: false,
