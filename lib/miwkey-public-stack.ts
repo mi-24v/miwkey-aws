@@ -63,7 +63,7 @@ export class MiwkeyPublicStack extends Stack {
             autoMinorVersionUpgrade: true,
             azMode: "single-az",
             cacheSubnetGroupName: queueSubnetGroup.cacheSubnetGroupName,
-            engineVersion: "6.2",
+            engineVersion: "7.0",
             preferredMaintenanceWindow: "tue:19:00-tue:22:00", // wed 04:00JST-07:00JST
             snapshotRetentionLimit: 5,
             vpcSecurityGroupIds: [props.defaultSG.securityGroupId]
