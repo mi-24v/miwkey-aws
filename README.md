@@ -7,7 +7,17 @@ deployment script for https://miwkey.miwpayou0808.info/ on AWS
 CDK app with an instance of a stack (`MiwkeyPublicStack`), which contains:
 
 * Amazon SQS queue 
-  * that is subscribed to an Amazon SNS topic.
+  * future use for replacing redis.
+* Amazon Elastic File System
+  * for mounting ECS volume
+* Amazon ElastiCache
+  * for ActivityPub Redis Queue
+* Amazon RDS
+  * using in misskey's database
+    * you can configure database username with `rdsUsername` Cfn Parameter
+    * CLI: `--parameters MiwkeyPublicStack:rdsUsername="your_database_username"`
+* `ApplicationLoadBalancedEc2Service`
+  * L3 construct for EC2-ECS misskey app with Auto Scaling Group
 * `MiwkeyNetworkStack`
   * you need to assign IP addresses in `lib/config/ipAddress.example.json` and rename it into `lib/config/ipAddress.json`
 
