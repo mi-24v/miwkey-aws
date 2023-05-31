@@ -1,11 +1,29 @@
-# Welcome to your CDK TypeScript project
+# miwkey-aws
 
-You should explore the contents of this project. It demonstrates a CDK app with an instance of a stack (`MiwkeyPublicStack`)
-which contains an Amazon SQS queue that is subscribed to an Amazon SNS topic.
+deployment script for https://miwkey.miwpayou0808.info/ on AWS
+
+## CDK TypeScript project structure
+
+CDK app with an instance of a stack (`MiwkeyPublicStack`), which contains:
+
+* Amazon SQS queue 
+  * future use for replacing redis.
+* Amazon Elastic File System
+  * for mounting ECS volume
+* Amazon ElastiCache
+  * for ActivityPub Redis Queue
+* Amazon RDS
+  * using in misskey's database
+    * you can configure database username with `rdsUsername` Cfn Parameter
+    * CLI: `--parameters MiwkeyPublicStack:rdsUsername="your_database_username"`
+* `ApplicationLoadBalancedEc2Service`
+  * L3 construct for EC2-ECS misskey app with Auto Scaling Group
+* `MiwkeyNetworkStack`
+  * you need to assign IP addresses in `lib/config/ipAddress.example.json` and rename it into `lib/config/ipAddress.json`
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
-## Useful commands
+## commands
 
 * `npm run build`   compile typescript to js
 * `npm run watch`   watch for changes and compile

@@ -1,0 +1,19 @@
+{
+    "vpcCIDR": "172.16.0.0/16",
+    "subnetCIDRs": [
+        {
+            "region": "ap-northeast-1a",
+            "ip": "172.16.0.0/24"
+        },
+        {
+            "region": "ap-northeast-1c",
+            "ip":"172.16.1.0/24"
+        },
+        {
+            "region": "ap-northeast-1d",
+            "ip": "172.16.2.0/24"
+        }
+    ],
+    "peerVpcId": "miwkey-sub",
+    "peerDestCIDR": "10.0.0.0/16"
+}
