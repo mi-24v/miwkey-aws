@@ -1,17 +1,45 @@
 import * as cdk from 'aws-cdk-lib';
-import { Template, Match } from 'aws-cdk-lib/assertions';
+import {Template, Match} from 'aws-cdk-lib/assertions';
 import * as MiwkeyPublic from '../lib/miwkey-public-stack';
+import {MiwkeyNetworkStack} from "../lib/miwkey-network";
+import {loadNetworkProps} from "../lib/config/loader";
+import {App} from "aws-cdk-lib";
 
-test('SQS Queue and SNS Topic Created', () => {
-  const app = new cdk.App();
-  // WHEN
-  const stack = new MiwkeyPublic.MiwkeyPublicStack(app, 'MyTestStack');
-  // THEN
+const app = new cdk.App()
 
-  const template = Template.fromStack(stack);
+const networkStack = jest.fn((app: App) => {
+    return new MiwkeyNetworkStack(app, 'MiwkeyTestNetworkStack', loadNetworkProps());
+})
 
-  template.hasResourceProperties('AWS::SQS::Queue', {
-    VisibilityTimeout: 300
-  });
-  template.resourceCountIs('AWS::SNS::Topic', 1);
+const targetStack = jest.fn((app: App, network: MiwkeyNetworkStack) => {
+    const stack = new MiwkeyPublic.MiwkeyPublicStack(app, 'MiwkeyTestStack', {
+        mainVpc: network.miwkeyMainVpc,
+        mainSubnets: network.miwkeyMainSubnets,
+        defaultSG: network.miwkeyDefaultSG,
+        loadBalancerSG: network.miwkeyLoadBalancerSG,
+        domainCertificate: network.miwkeyDomainCertificate
+    });
+    stack.addDependency(network)
+    return stack
+})
+
+test('Job Queue and Subnet Group Created', () => {
+    const network = networkStack(app);
+    const template = Template.fromStack(targetStack(app, network));
+
+    template.hasResourceProperties('AWS::ElastiCache::CacheCluster', {
+        CacheNodeType: "cache.t4g.micro",
+        Engine: "redis",
+        NumCacheNodes: 1,
+        AutoMinorVersionUpgrade: true,
+        AZMode: "single-az",
+        CacheSubnetGroupName: "miwkey-queue-network",
+        EngineVersion: "7.0",
+        PreferredMaintenanceWindow: "tue:19:00-tue:22:00",
+        SnapshotRetentionLimit: 5,
+    });
+    template.hasResourceProperties('AWS::ElastiCache::SubnetGroup', {
+        SubnetIds: network.miwkeyMainSubnets.map(s => s.subnetId),
+        CacheSubnetGroupName: "miwkey-queue-network"
+    });
 });
