@@ -42,7 +42,17 @@ export class MiwkeyPublicStack extends Stack {
 
         topic.addSubscription(new subs.SqsSubscription(queue));
 
-        const configFs = new FileSystem(this, "miwkeyConfigFs", {
+        const configFs = this.miwkeyEFS(props, subnetSelection);
+
+        const postQueue = this.miwkeyPostQueue(props);
+
+        const mainDatabase = this.miwkeyMainDB(props, databaseUsername, subnetSelection);
+
+        this.miwkeyMainCluster(props, subnetSelection, configFs, mainDatabase, postQueue);
+    }
+
+    private miwkeyEFS(props: MiwkeyPublicStackProps, subnetSelection: SubnetSelection) {
+        return new FileSystem(this, "miwkeyConfigFs", {
             vpc: props.mainVpc,
             vpcSubnets: subnetSelection,
             encrypted: true,
@@ -50,27 +60,10 @@ export class MiwkeyPublicStack extends Stack {
             securityGroup: props.defaultSG,
             removalPolicy: RemovalPolicy.DESTROY
         })
+    }
 
-        const queueSubnetGroup = new aws_elasticache.CfnSubnetGroup(this, "miwkeyQueueNetwork", {
-            description: "subnet group for miwkey Redis",
-            subnetIds: props.mainSubnets.map(s => s.subnetId),
-            cacheSubnetGroupName: "miwkey-queue-network"
-        })
-        const postQueue = new CfnCacheCluster(this, "miwkeyQueueRedis", {
-            cacheNodeType: "cache.t4g.micro",
-            engine: "redis",
-            numCacheNodes: 1,
-            autoMinorVersionUpgrade: true,
-            azMode: "single-az",
-            cacheSubnetGroupName: queueSubnetGroup.cacheSubnetGroupName,
-            engineVersion: "7.0",
-            preferredMaintenanceWindow: "tue:19:00-tue:22:00", // wed 04:00JST-07:00JST
-            snapshotRetentionLimit: 5,
-            vpcSecurityGroupIds: [props.defaultSG.securityGroupId]
-        })
-        postQueue.node.addDependency(queueSubnetGroup)
-
-        const mainDatabase = new DatabaseInstance(this, "miwkeyMainDB", {
+    private miwkeyMainDB(props: MiwkeyPublicStackProps, databaseUsername: CfnParameter, subnetSelection: SubnetSelection) {
+        return new DatabaseInstance(this, "miwkeyMainDB", {
             engine: DatabaseInstanceEngine.postgres({
                 version: PostgresEngineVersion.of("15.2", "15")
             }),
@@ -95,8 +88,31 @@ export class MiwkeyPublicStack extends Stack {
             storageType: StorageType.GP3,
             vpcSubnets: subnetSelection
         });
+    }
 
+    private miwkeyPostQueue(props: MiwkeyPublicStackProps) {
+        const queueSubnetGroup = new aws_elasticache.CfnSubnetGroup(this, "miwkeyQueueNetwork", {
+            description: "subnet group for miwkey Redis",
+            subnetIds: props.mainSubnets.map(s => s.subnetId),
+            cacheSubnetGroupName: "miwkey-queue-network"
+        })
+        const postQueue = new CfnCacheCluster(this, "miwkeyQueueRedis", {
+            cacheNodeType: "cache.t4g.micro",
+            engine: "redis",
+            numCacheNodes: 1,
+            autoMinorVersionUpgrade: true,
+            azMode: "single-az",
+            cacheSubnetGroupName: queueSubnetGroup.cacheSubnetGroupName,
+            engineVersion: "7.0",
+            preferredMaintenanceWindow: "tue:19:00-tue:22:00", // wed 04:00JST-07:00JST
+            snapshotRetentionLimit: 5,
+            vpcSecurityGroupIds: [props.defaultSG.securityGroupId]
+        })
+        postQueue.node.addDependency(queueSubnetGroup)
+        return postQueue;
+    }
 
+    private miwkeyMainCluster(props: MiwkeyPublicStackProps, subnetSelection: SubnetSelection, configFs: FileSystem, mainDatabase: DatabaseInstance, postQueue: CfnCacheCluster) {
         const miwkeyMainCluster = new Cluster(this, "miwkeyEcsCluster", {
             containerInsights: true,
             vpc: props.mainVpc
