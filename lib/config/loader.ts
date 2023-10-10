@@ -3,6 +3,7 @@ import * as fs from "fs";
 import {z} from "zod";
 import {MiwkeyIp} from "../types/miwkey-ip";
 import * as path from "path";
+import {Environment} from "aws-cdk-lib";
 
 
 export function loadNetworkProps(): MiwkeyNetworkStackProps {
@@ -24,4 +25,13 @@ export function loadNetworkProps(): MiwkeyNetworkStackProps {
         ipAddresses: ipConfSchema.parse(rawIpConf) as MiwkeyIp,
         certificateArn: netPropsSchema.parse(rawNetProps).certificateArn
     }
+}
+
+export function loadEnvironment() {
+    const environmentSchema = z.object({
+        account: z.string().regex(/^\d{12}/g),
+        region: z.string()
+    })
+    const rawEnv = JSON.parse(fs.readFileSync(path.join(__dirname, ".", "environment.json"), {encoding: "utf-8"}))
+    return environmentSchema.parse(rawEnv) as Environment
 }
