@@ -14,6 +14,9 @@ import {
 import {Duration, RemovalPolicy} from "aws-cdk-lib";
 import {BlockPublicAccess, Bucket, BucketEncryption, StorageClass} from "aws-cdk-lib/aws-s3";
 import {IGrantable, ManagedPolicy, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
+import {ARecord, PrivateHostedZone, RecordTarget} from "aws-cdk-lib/aws-route53";
+import {MiwkeyMeilisearchProps} from "./types/stackprops";
+import {loadMeilisearchProps} from "./config/loader";
 
 
 export function meilisearchInstance(scope: Construct, vpc: Vpc, subnets: SubnetSelection, securityGroup: SecurityGroup) {
@@ -45,8 +48,9 @@ export function meilisearchInstance(scope: Construct, vpc: Vpc, subnets: SubnetS
         ssmSessionPermissions: true,
         vpcSubnets: subnets
     })
+    const [zone, record] = meilisearchDNSRecord(scope, vpc, instance.instancePrivateIp, loadMeilisearchProps())
     instance.node.addDependency(bucket)
-    return (instance)
+    return [instance, zone, record]
 }
 
 function meilisearchBackupStorage(scope: Construct, grantTarget: IGrantable) {
@@ -71,4 +75,16 @@ function meilisearchBackupStorage(scope: Construct, grantTarget: IGrantable) {
     })
     bucket.grantReadWrite(grantTarget)
     return bucket
+}
+
+function meilisearchDNSRecord(scope: Construct, vpc: Vpc, instanceIp: string, props: MiwkeyMeilisearchProps): [PrivateHostedZone, ARecord] {
+    const zone = new PrivateHostedZone(scope, "meilisearch-dns-zone", {
+        vpc: vpc,
+        zoneName: props.targetFQDN
+    })
+    const record = new ARecord(scope, "meilisearch-dns-record", {
+        zone: zone,
+        target: RecordTarget.fromIpAddresses(...instanceIp)
+    })
+    return [zone, record]
 }

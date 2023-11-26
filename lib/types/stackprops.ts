@@ -16,3 +16,7 @@ export interface MiwkeyNetworkStackProps extends StackProps{
     ipAddresses: MiwkeyIp,
     certificateArn: string
 }
+
+export interface MiwkeyMeilisearchProps extends StackProps{
+    targetFQDN: string
+}
