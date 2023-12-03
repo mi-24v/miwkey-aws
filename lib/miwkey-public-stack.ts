@@ -21,7 +21,7 @@ import {
 import {ApplicationLoadBalancer} from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import {miwkeyConfigMountPoint, miwkeyMainTaskDefinition, miwkeyMigrationTaskDefinition} from "./taskdef";
 import {AutoScalingGroup} from "aws-cdk-lib/aws-autoscaling";
-import {meilisearchInstance} from "./meilisearch";
+import {meilisearchDNSRecord} from "./meilisearch/meilisearch-miwkey";
 
 export class MiwkeyPublicStack extends Stack {
     constructor(scope: Construct, id: string, props: MiwkeyPublicStackProps) {
@@ -49,7 +49,9 @@ export class MiwkeyPublicStack extends Stack {
 
         const mainDatabase = this.miwkeyMainDB(props, databaseUsername, subnetSelection);
 
-        meilisearchInstance(this, props.mainVpc, subnetSelection, props.defaultSG)
+        if (typeof (props.meilisearchInstance) !== "undefined") {
+            meilisearchDNSRecord(this, props.mainVpc, props.meilisearchInstance)
+        }
 
         this.miwkeyMainCluster(props, subnetSelection, configFs, mainDatabase, postQueue);
     }
