@@ -11,9 +11,10 @@ import {
     MachineImage,
     SecurityGroup,
     SubnetSelection,
+    UserData,
     Vpc
 } from "aws-cdk-lib/aws-ec2";
-import {IGrantable} from "aws-cdk-lib/aws-iam";
+import {IGrantable, ManagedPolicy, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 import {BlockPublicAccess, Bucket, BucketEncryption, StorageClass} from "aws-cdk-lib/aws-s3";
 
 
@@ -24,12 +25,20 @@ export class MeilisearchInstanceStack extends Stack {
     constructor(scope: Construct, id: string, props: MeilisearchInstanceProps) {
         super(scope, id, props);
 
-        const instance= this.createMeilisearchInstance(this, props.instanceVpc, props.instanceSubnets, props.instanceSecurityGroup);
-        this.meilisearchBackupStorage = this.createMeilisearchBackupStorage(this, instance.role);
-        this.meilisearchInstance = instance
+        const instanceRole = this.createMeilisearchInstanceRole(this);
+        this.meilisearchInstance = this.createMeilisearchInstance(this, props.instanceVpc, props.instanceSubnets, props.instanceSecurityGroup, instanceRole);
+        this.meilisearchBackupStorage = this.createMeilisearchBackupStorage(this, instanceRole);
     }
 
-    private createMeilisearchInstance(scope: Construct, vpc: Vpc, subnets: SubnetSelection, securityGroup: SecurityGroup): Instance {
+    private createMeilisearchInstance(scope: Construct, vpc: Vpc, subnets: SubnetSelection, securityGroup: SecurityGroup, instanceRole: Role): Instance {
+        const ssmSetupShell = UserData.forLinux()
+        ssmSetupShell.addCommands(
+            "mkdir /tmp/ssm",
+            "cd /tmp/ssm",
+            "wget https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_amd64/amazon-ssm-agent.deb",
+            "sudo dpkg -i amazon-ssm-agent.deb",
+            "sudo systemctl enable amazon-ssm-agent"
+        )
         return new Instance(scope, "miwkey-meilisearch", {
             instanceType: InstanceType.of(InstanceClass.T3A, InstanceSize.MICRO),
             machineImage: MachineImage.lookup({
@@ -48,10 +57,18 @@ export class MeilisearchInstanceStack extends Stack {
                 }
             ],
             detailedMonitoring: true,
+            role: instanceRole,
             securityGroup: securityGroup,
-            ssmSessionPermissions: true,
-            vpcSubnets: subnets
+            vpcSubnets: subnets,
+            userData: ssmSetupShell
         })
+    }
+
+    private createMeilisearchInstanceRole(scope: Construct) {
+        return new Role(scope, "miwkey-meiliseach-instance-role", {
+            assumedBy: new ServicePrincipal("ec2.amazonaws.com"),
+            managedPolicies: [ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")]
+        });
     }
 
     private createMeilisearchBackupStorage(scope: Construct, grantTarget: IGrantable) {

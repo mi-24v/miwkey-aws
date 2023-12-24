@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
+import {Environment} from 'aws-cdk-lib';
 import {MiwkeyPublicStack} from '../lib/miwkey-public-stack';
 import {MiwkeyNetworkStack} from "../lib/miwkey-network";
 import {MiwkeyNetworkStackProps} from "../lib/types/stackprops";
 import {loadEnvironment, loadMeilisearchProps, loadNetworkProps} from "../lib/config/loader";
-import {Environment} from "aws-cdk-lib";
 import {MeilisearchInstanceStack} from "../lib/meilisearch/meilisearch-instance";
 
 const app = new cdk.App();
