@@ -14,7 +14,15 @@ import {
     UserData,
     Vpc
 } from "aws-cdk-lib/aws-ec2";
-import {IGrantable, ManagedPolicy, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
+import {
+    Effect,
+    IGrantable,
+    ManagedPolicy,
+    PolicyDocument,
+    PolicyStatement,
+    Role,
+    ServicePrincipal
+} from "aws-cdk-lib/aws-iam";
 import {BlockPublicAccess, Bucket, BucketEncryption, StorageClass} from "aws-cdk-lib/aws-s3";
 
 
@@ -67,7 +75,38 @@ export class MeilisearchInstanceStack extends Stack {
     private createMeilisearchInstanceRole(scope: Construct) {
         return new Role(scope, "miwkey-meiliseach-instance-role", {
             assumedBy: new ServicePrincipal("ec2.amazonaws.com"),
-            managedPolicies: [ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")]
+            managedPolicies: [ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")],
+            inlinePolicies: {
+                "certbotDnsReadPolicy": new PolicyDocument({
+                    assignSids: false,
+                    minimize: false,
+                    statements: [
+                        new PolicyStatement({
+                            effect: Effect.ALLOW,
+                            actions: [
+                                "route53:ListHostedZones",
+                                "route53:GetChange"
+                            ],
+                            // ここで細かく指定すると通らなくなる
+                            resources: ["*"]
+                        })
+                    ]
+                }),
+                "certbotDnsUpdatePolicy": new PolicyDocument({
+                    assignSids: false,
+                    minimize: false,
+                    statements: [
+                        new PolicyStatement({
+                            effect: Effect.ALLOW,
+                            actions: [
+                                "route53:ChangeResourceRecordSets"
+                            ],
+                            // Zone側で指定できない(循環参照になる)ので仕方なくこうする
+                            resources: [`arn:aws:route53:::hostedzone/*`]
+                        })
+                    ]
+                })
+            }
         });
     }
 
