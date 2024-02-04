@@ -11,9 +11,9 @@ export function meilisearchDNSRecord(scope: Construct, vpc: Vpc, props: MiwkeyMe
     })
     const record = new ARecord(scope, "meilisearch-dns-record", {
         zone: zone,
-        target: RecordTarget.fromIpAddresses(...[props.meilisearchInstance.instancePrivateIp])
+        target: RecordTarget.fromIpAddresses(...["192.158.1.38"])
     })
-    zone.node.addDependency(props.meilisearchInstance)
+    // zone.node.addDependency(props.meilisearchInstance)
     record.node.addDependency(zone)
     return [zone, record]
 }

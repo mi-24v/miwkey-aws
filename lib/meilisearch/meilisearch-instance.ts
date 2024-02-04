@@ -50,7 +50,7 @@ export class MeilisearchInstanceStack extends Stack {
         return new Instance(scope, "miwkey-meilisearch", {
             instanceType: InstanceType.of(InstanceClass.T3A, InstanceSize.MICRO),
             machineImage: MachineImage.lookup({
-                name: "Meilisearch-v1.4.0-Debian-11",
+                name: "Meilisearch-v1.6.0-Debian-11",
                 owners: ["567502172578"]
             }),
             vpc: vpc,
