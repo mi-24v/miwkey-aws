@@ -109,6 +109,7 @@ export class MiwkeyNetworkStack extends Stack {
         const ipv6Addresses = Ipv6Addresses.amazonProvided();
 
         this.miwkeyMainVpc = new aws_ec2.Vpc(this, "miwkeyMainVPC", {
+                createInternetGateway: false,
                 ipAddresses: aws_ec2.IpAddresses.cidr(props.ipAddresses.vpcCIDR),
                 ipProtocol: IpProtocol.DUAL_STACK,
                 ipv6Addresses: ipv6Addresses,
@@ -131,8 +132,8 @@ export class MiwkeyNetworkStack extends Stack {
         )
         this.miwkeyMainVpc.applyRemovalPolicy(RemovalPolicy.RETAIN)
         const ipv6CidrBlocks = ipv6Addresses.createIpv6CidrBlocks({
-            ipv6SelectedCidr: this.miwkeyMainVpc.vpcCidrBlock,
-            subnetCount: 3
+            ipv6SelectedCidr: Fn.select(0, this.miwkeyMainVpc.vpcIpv6CidrBlocks),
+            subnetCount: 6
         });
         this.miwkeyMainSubnets = props.ipAddresses.subnetCIDRs.map((s, index) => {
             return new Subnet(this, `miwkey-subnet-${index}`, {
@@ -140,7 +141,7 @@ export class MiwkeyNetworkStack extends Stack {
                 cidrBlock: s.ip,
                 vpcId: this.miwkeyMainVpc.vpcId,
                 assignIpv6AddressOnCreation: true,
-                ipv6CidrBlock: Fn.select(index, ipv6CidrBlocks),
+                ipv6CidrBlock: Fn.select(index + 3, ipv6CidrBlocks), // stubの分を加味しておく
                 mapPublicIpOnLaunch: true // public subnet扱いにさせるため必要
             })
         })
