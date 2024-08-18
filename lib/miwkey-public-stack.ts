@@ -140,6 +140,7 @@ export class MiwkeyPublicStack extends Stack {
                 vpcSubnets: subnetSelection,
                 vpc: props.mainVpc
             }),
+            enableManagedDraining: true,
             enableManagedScaling: true,
             enableManagedTerminationProtection: true
         });
