@@ -7,7 +7,13 @@ import {MiwkeyPublicStackProps} from "./types/stackprops";
 import {FileSystem} from "aws-cdk-lib/aws-efs";
 import {configFSPolicy, miwkeyECSTaskRolePolicy} from "./iam-policies";
 import {CfnCacheCluster} from "aws-cdk-lib/aws-elasticache";
-import {DatabaseInstance, DatabaseInstanceEngine, PostgresEngineVersion, StorageType} from "aws-cdk-lib/aws-rds";
+import {
+    CaCertificate,
+    DatabaseInstance,
+    DatabaseInstanceEngine,
+    PostgresEngineVersion,
+    StorageType
+} from "aws-cdk-lib/aws-rds";
 import {InstanceClass, InstanceSize, InstanceType, SubnetSelection} from "aws-cdk-lib/aws-ec2";
 import {ApplicationLoadBalancedEc2Service} from "aws-cdk-lib/aws-ecs-patterns";
 import {
@@ -77,6 +83,7 @@ export class MiwkeyPublicStack extends Stack {
             allowMajorVersionUpgrade: false,
             autoMinorVersionUpgrade: true,
             backupRetention: Duration.days(7),
+            caCertificate: CaCertificate.RDS_CA_RDS4096_G1,
             credentials: {
                 username: databaseUsername.valueAsString
             },
