@@ -18,7 +18,7 @@ import {
     EcsOptimizedImage,
     PlacementStrategy
 } from "aws-cdk-lib/aws-ecs";
-import {ApplicationLoadBalancer} from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import {ApplicationLoadBalancer, IpAddressType} from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import {miwkeyConfigMountPoint, miwkeyMainTaskDefinition, miwkeyMigrationTaskDefinition} from "./taskdef";
 import {AutoScalingGroup} from "aws-cdk-lib/aws-autoscaling";
 import {meilisearchDNSRecord} from "./meilisearch/meilisearch-miwkey";
@@ -162,6 +162,7 @@ export class MiwkeyPublicStack extends Stack {
             loadBalancer: new ApplicationLoadBalancer(this, "miwkeyMainLB", {
                 vpc: props.mainVpc,
                 vpcSubnets: subnetSelection,
+                ipAddressType: IpAddressType.DUAL_STACK,
                 internetFacing: true,
                 securityGroup: props.loadBalancerSG
             }),
