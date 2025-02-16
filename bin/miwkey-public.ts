@@ -27,10 +27,10 @@ const miwkey = new MiwkeyPublicStack(app, 'MiwkeyPublicStack', {
     defaultSG: network.miwkeyDefaultSG,
     loadBalancerSG: network.miwkeyLoadBalancerSG,
     domainCertificate: network.miwkeyDomainCertificate,
-    meilisearchInstance: {
-        meilisearchInstance: meilisearch.meilisearchInstance,
-        ...loadMeilisearchProps()
-    },
+    // meilisearchInstance: {
+    //     meilisearchInstance: meilisearch.meilisearchInstance,
+    //     ...loadMeilisearchProps()
+    // },
     env: env
 });
 
