@@ -170,7 +170,7 @@ export class MiwkeyPublicStack extends Stack {
             loadBalancer: new ApplicationLoadBalancer(this, "miwkeyMainLB", {
                 vpc: props.mainVpc,
                 vpcSubnets: subnetSelection,
-                ipAddressType: IpAddressType.DUAL_STACK,
+                ipAddressType: IpAddressType.DUAL_STACK_WITHOUT_PUBLIC_IPV4,
                 internetFacing: true,
                 securityGroup: props.loadBalancerSG
             }),

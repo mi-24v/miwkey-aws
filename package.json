@@ -21,7 +21,7 @@
         "typescript": "~4.9.4"
     },
     "dependencies": {
-        "aws-cdk-lib": "^2.131.0",
+        "aws-cdk-lib": "^2.217.0",
         "constructs": "^10.0.0",
         "zod": "^3.23.0-canary.20240222T232722"
     }

@@ -34,7 +34,7 @@ export class MeilisearchInstanceStack extends Stack {
         super(scope, id, props);
 
         const instanceRole = this.createMeilisearchInstanceRole(this);
-        this.meilisearchInstance = this.createMeilisearchInstance(this, props.instanceVpc, props.instanceSubnets, props.instanceSecurityGroup, instanceRole);
+        // this.meilisearchInstance = this.createMeilisearchInstance(this, props.instanceVpc, props.instanceSubnets, props.instanceSecurityGroup, instanceRole);
         this.meilisearchBackupStorage = this.createMeilisearchBackupStorage(this, instanceRole);
     }
 
