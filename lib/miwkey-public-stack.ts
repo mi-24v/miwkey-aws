@@ -135,7 +135,7 @@ export class MiwkeyPublicStack extends Stack {
                 capacityRebalance: true,
                 machineImage: EcsOptimizedImage.amazonLinux2(AmiHardwareType.ARM),
                 securityGroup: props.defaultSG,
-                spotPrice: "0.01", // 7.2usd/mo
+                spotPrice: "0.015", // 10.8usd/mo
                 ssmSessionPermissions: true,
                 vpcSubnets: subnetSelection,
                 vpc: props.mainVpc
