@@ -22,6 +22,7 @@ import {
     Cluster,
     ContainerDependencyCondition,
     EcsOptimizedImage,
+    PlacementConstraint,
     PlacementStrategy
 } from "aws-cdk-lib/aws-ecs";
 import {ApplicationLoadBalancer, IpAddressType} from "aws-cdk-lib/aws-elasticloadbalancingv2";
@@ -175,8 +176,11 @@ export class MiwkeyPublicStack extends Stack {
                 securityGroup: props.loadBalancerSG
             }),
             openListener: false,
+            placementConstraints: [
+                PlacementConstraint.distinctInstances()
+            ],
             placementStrategies: [
-                PlacementStrategy.spreadAcrossInstances()
+                PlacementStrategy.packedByMemory()
             ],
             redirectHTTP: true,
             taskImageOptions: miwkeyMainTaskDefinition()
