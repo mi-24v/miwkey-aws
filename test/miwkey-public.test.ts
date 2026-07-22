@@ -99,3 +99,13 @@ test('ECS keeps two tasks on distinct container instances', () => {
     ])
   });
 });
+
+test('ECS keeps all desired tasks healthy during deployments', () => {
+  const template = createTemplate();
+
+  template.hasResourceProperties('AWS::ECS::Service', {
+    DeploymentConfiguration: Match.objectLike({
+      MinimumHealthyPercent: 100
+    })
+  });
+});

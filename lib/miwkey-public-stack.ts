@@ -210,6 +210,7 @@ export class MiwkeyPublicStack extends Stack {
             },
             cpu: 1024,
             desiredCount: 2,
+            minHealthyPercent: 100,
             memoryReservationMiB: 1100,
             enableECSManagedTags: true,
             enableExecuteCommand: false,

@@ -13,7 +13,7 @@
 - Start from `feature/asg-stabilization`, which branches from `develop` at `ed525fc`.
 - Preserve `feature/full-refactor` at `155db42`; do not merge, rebase, or reset it.
 - Reuse only `67024a6` and `e9f190e` from the ASG work before adding the test repair and capacity fix.
-- Keep `desiredCount: 2`, `PlacementConstraint.distinctInstances()`, and `PlacementStrategy.packedByMemory()`.
+- Keep `desiredCount: 2`, `minHealthyPercent: 100`, `PlacementConstraint.distinctInstances()`, and `PlacementStrategy.packedByMemory()`.
 - Set ASG `maxCapacity` to exactly `4`.
 - Keep the six Graviton Spot types: `t4g.small`, `t4g.medium`, `m6g.medium`, `m7g.medium`, `c6g.medium`, and `c7g.medium`.
 - Keep Spot allocation strategy `capacity-optimized` and 100% Spot capacity.
@@ -236,6 +236,16 @@ test('ECS keeps two tasks on distinct container instances', () => {
     ])
   });
 });
+
+test('ECS keeps all desired tasks healthy during deployments', () => {
+  const template = createTemplate();
+
+  template.hasResourceProperties('AWS::ECS::Service', {
+    DeploymentConfiguration: Match.objectLike({
+      MinimumHealthyPercent: 100
+    })
+  });
+});
 ```
 
 - [ ] **Step 2: Run the tests and confirm the regressions fail**
@@ -246,9 +256,9 @@ Run:
 mise exec -- npm test -- --runInBand
 ```
 
-Expected: the new capacity assertion fails while `MaxSize` is `"1"`, and the rolling migration assertion fails while `AutoScalingRollingUpdate` is absent. Confirm both failures before changing production code.
+Expected: the new capacity assertion fails while `MaxSize` is `"1"`, the rolling migration assertion fails while `AutoScalingRollingUpdate` is absent, and the ECS deployment assertion fails while `MinimumHealthyPercent` is `50`. Confirm the failures before changing production code.
 
-- [ ] **Step 3: Set the ASG maximum capacity and rolling migration policy**
+- [ ] **Step 3: Set the ASG migration policy and ECS deployment availability**
 
 In the `new AutoScalingGroup(this, "miwkeyASG", ...)` properties, add the capacity and migration settings immediately after `capacityRebalance`:
 
@@ -263,6 +273,15 @@ updatePolicy: UpdatePolicy.rollingUpdate({
   pauseTime: Duration.minutes(5)
 }),
 vpcSubnets: subnetSelection,
+```
+
+In the `ApplicationLoadBalancedEc2Service` properties, keep every desired task
+healthy during deployments:
+
+```typescript
+desiredCount: 2,
+minHealthyPercent: 100,
+memoryReservationMiB: 1100,
 ```
 
 - [ ] **Step 4: Verify tests, type checking, build output, and synthesis**
