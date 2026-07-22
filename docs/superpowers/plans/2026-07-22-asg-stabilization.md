@@ -220,7 +220,7 @@ test('ECS keeps two tasks on distinct container instances', () => {
       { Type: 'distinctInstance' }
     ]),
     PlacementStrategies: Match.arrayWith([
-      { Field: 'memory', Type: 'binpack' }
+      { Field: 'MEMORY', Type: 'binpack' }
     ])
   });
 });
