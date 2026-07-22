@@ -48,14 +48,14 @@ test('ASG has capacity for redundant tasks and replacement headroom', () => {
   });
 });
 
-test('ASG rolls launch template migration without dropping all instances', () => {
+test('ASG rolls launch template migration while keeping redundant instances', () => {
   const template = createTemplate();
 
   template.hasResource('AWS::AutoScaling::AutoScalingGroup', {
     UpdatePolicy: {
       AutoScalingRollingUpdate: {
         MaxBatchSize: 1,
-        MinInstancesInService: 1,
+        MinInstancesInService: 2,
         PauseTime: 'PT5M'
       }
     }

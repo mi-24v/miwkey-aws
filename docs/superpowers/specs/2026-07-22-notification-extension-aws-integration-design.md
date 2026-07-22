@@ -292,7 +292,7 @@ are deployment-time values.
 - Jest passes.
 - Synthesized ASG has `MaxSize: 4`.
 - Synthesized ASG has top-level `UpdatePolicy.AutoScalingRollingUpdate` with
-  `MaxBatchSize: 1`, `MinInstancesInService: 1`, and `PauseTime: PT5M`.
+  `MaxBatchSize: 1`, `MinInstancesInService: 2`, and `PauseTime: PT5M`.
 - Main ECS service has `DesiredCount: 2`.
 - The service uses `distinctInstance`.
 - The ASG contains all six intended Graviton instance types.

@@ -159,7 +159,7 @@ export class MiwkeyPublicStack extends Stack {
                 migrateToLaunchTemplate: true,
                 updatePolicy: UpdatePolicy.rollingUpdate({
                     maxBatchSize: 1,
-                    minInstancesInService: 1,
+                    minInstancesInService: 2,
                     pauseTime: Duration.minutes(5)
                 }),
                 vpcSubnets: subnetSelection,
