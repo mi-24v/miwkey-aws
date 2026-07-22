@@ -138,7 +138,7 @@ test('SQS Queue and SNS Topic Created', () => {
 });
 ```
 
-The `Match` import is intentionally introduced here because Task 3 uses it for partial array assertions.
+The `Match` import is intentionally introduced here because Task 3 uses CDK assertion matchers.
 
 - [ ] **Step 2: Verify the fixture compiles and the existing test passes**
 
