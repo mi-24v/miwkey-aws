@@ -154,6 +154,8 @@ export class MiwkeyPublicStack extends Stack {
         const miwkeyMainAsgCapacityProvider = new AsgCapacityProvider(this, "miwkeyAsgCapacityProvider", {
             autoScalingGroup: new AutoScalingGroup(this, "miwkeyASG", {
                 capacityRebalance: true,
+                // Two steady-state instances plus room for rolling replacement and Spot rebalance.
+                maxCapacity: 4,
                 vpcSubnets: subnetSelection,
                 vpc: props.mainVpc,
                 // 単一インスタンスタイプ(t4g.small)の100% Spotだと、そのAZ/タイプのプールが

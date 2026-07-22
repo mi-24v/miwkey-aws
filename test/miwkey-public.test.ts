@@ -35,3 +35,49 @@ test('SQS Queue and SNS Topic Created', () => {
   });
   template.resourceCountIs('AWS::SNS::Topic', 1);
 });
+
+test('ASG has capacity for redundant tasks and replacement headroom', () => {
+  const template = createTemplate();
+
+  template.hasResourceProperties('AWS::AutoScaling::AutoScalingGroup', {
+    MaxSize: '4'
+  });
+});
+
+test('ASG uses diversified capacity-optimized Spot pools', () => {
+  const template = createTemplate();
+
+  template.hasResourceProperties('AWS::AutoScaling::AutoScalingGroup', {
+    MixedInstancesPolicy: Match.objectLike({
+      InstancesDistribution: Match.objectLike({
+        OnDemandBaseCapacity: 0,
+        OnDemandPercentageAboveBaseCapacity: 0,
+        SpotAllocationStrategy: 'capacity-optimized'
+      }),
+      LaunchTemplate: Match.objectLike({
+        Overrides: Match.arrayWith([
+          { InstanceType: 't4g.small' },
+          { InstanceType: 't4g.medium' },
+          { InstanceType: 'm6g.medium' },
+          { InstanceType: 'm7g.medium' },
+          { InstanceType: 'c6g.medium' },
+          { InstanceType: 'c7g.medium' }
+        ])
+      })
+    })
+  });
+});
+
+test('ECS keeps two tasks on distinct container instances', () => {
+  const template = createTemplate();
+
+  template.hasResourceProperties('AWS::ECS::Service', {
+    DesiredCount: 2,
+    PlacementConstraints: Match.arrayWith([
+      { Type: 'distinctInstance' }
+    ]),
+    PlacementStrategies: Match.arrayWith([
+      { Field: 'MEMORY', Type: 'binpack' }
+    ])
+  });
+});
