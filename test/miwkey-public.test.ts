@@ -36,6 +36,10 @@ test('SQS Queue and SNS Topic Created', () => {
   template.resourceCountIs('AWS::SNS::Topic', 1);
 });
 
+test('Jest resolves colocated stack imports to TypeScript sources', () => {
+  expect(require.resolve('../lib/miwkey-public-stack')).toMatch(/\.ts$/);
+});
+
 test('ASG has capacity for redundant tasks and replacement headroom', () => {
   const template = createTemplate();
 
@@ -55,7 +59,7 @@ test('ASG uses diversified capacity-optimized Spot pools', () => {
         SpotAllocationStrategy: 'capacity-optimized'
       }),
       LaunchTemplate: Match.objectLike({
-        Overrides: Match.arrayWith([
+        Overrides: Match.arrayEquals([
           { InstanceType: 't4g.small' },
           { InstanceType: 't4g.medium' },
           { InstanceType: 'm6g.medium' },
