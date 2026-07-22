@@ -4,7 +4,7 @@
 
 Cloud確認で検出した、ASG rolling update中に1台まで減らせる問題と、ECS
 deployment中に1タスクまで減らせる問題は修正済みです。マージを妨げる指摘は
-ありません。修正後のChange Set確認はデプロイゲートとして残っています。
+ありません。修正後のChange Set確認と本番デプロイまで完了しています。
 
 ## 検証
 
@@ -22,18 +22,22 @@ deployment中に1タスクまで減らせる問題は修正済みです。マー
 
 ## Cloud確認
 
-- パラメータを指定した既存Change SetではRDS Secret差分が消えています。
-- 実ASGは `DesiredCapacity: 2` / `MaxSize: 2` で、Healthyな2台が稼働しています。
-- 実ECS serviceは `desiredCount: 2` / `runningCount: 2` / `pendingCount: 0` です。
-- Launch Template移行時にARM64 ECS Optimized AL2 AMIが`20251031`版から
-  `20260714`版へ更新されます。新AMIはavailableです。
+- パラメータを指定したChange SetではRDS Secret差分がなく、想定したASG/ECS差分
+  のみであることを確認しました。
+- CloudFormation stackは `UPDATE_COMPLETE` です。
+- 実ASGは `MinSize: 1` / `MaxSize: 4` / `DesiredCapacity: 2` で、
+  `capacity-optimized` のMixed Instances PolicyとLaunch Templateへ移行済みです。
+- 新しい2台のcontainer instanceは `InService` / `Healthy` です。
+- 実ECS serviceは `desiredCount: 2` / `runningCount: 2` / `pendingCount: 0`、
+  deploymentは `COMPLETED` です。
+- ALB targetは新しい2台とも `healthy` です。
+- 旧container instance 1台はECS managed drainingによる `Terminating:Wait` ですが、
+  `DRAINING` / running tasks 0 / ALB登録なしで、サービス影響はありません。
 
 ## 残存リスク
 
-- 既存の `asg-stabilization-review` Change Setは今回の2修正より前に作成されて
-  います。削除して再作成し、Secret差分がなく、ASGが最低2台、ECSが最低100%
-  healthyになることをデプロイ前に確認します。
-- rolling update の pause はアプリケーションの正常性を保証しないため、初回
-  デプロイ中は ECS running task、新規 container instance、ALB health を監視します。
+- 旧container instanceの終了はECS managed drainingのlifecycle hook待ちです。
+  hookは `HeartbeatTimeout: 3600` / `GlobalTimeout: 172800` / `DefaultResult: CONTINUE`
+  であり、稼働リソースからは切り離されています。
 - 既存の deprecated `containerInsights` とECS IMDSのwarningは今回のスコープ外です。
 - `npm ci` が報告する依存関係 vulnerability は今回のスコープ外です。
