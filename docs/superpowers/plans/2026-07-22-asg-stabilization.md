@@ -4,9 +4,9 @@
 
 **Goal:** Produce a minimal deployable branch where two Misskey ECS tasks can run on distinct EC2 instances backed by diversified Spot capacity and an ASG with enough replacement headroom.
 
-**Architecture:** Reuse the reviewed placement and Mixed Instances Policy commits without bringing in the full refactor. Repair the existing CDK test fixture, add synthesized-template regression assertions, then raise the ASG maximum capacity from the CDK default of one to four.
+**Architecture:** Reuse the reviewed placement and Mixed Instances Policy commits without bringing in the full refactor. Repair the existing CDK test fixture, add synthesized-template regression assertions, raise the ASG maximum capacity from the CDK default of one to four, and migrate existing instances to the launch template with a one-at-a-time rolling update.
 
-**Tech Stack:** TypeScript 4.9, AWS CDK v2 (`aws-cdk-lib` 2.217.0), Jest 29 with `ts-jest`, Node.js via mise
+**Tech Stack:** TypeScript 4.9, AWS CDK v2 (`aws-cdk-lib` 2.217.x and `aws-cdk` CLI 2.1132.0), Jest 29 with `ts-jest`, Node.js via mise
 
 ## Global Constraints
 
@@ -19,7 +19,7 @@
 - Keep Spot allocation strategy `capacity-optimized` and 100% Spot capacity.
 - Run Node.js, npm, and CDK commands through `mise exec --`.
 - Do not stage or commit the existing untracked `.ai/` and `.claude/` directories.
-- Commit tracked transpiled `.js` outputs produced by the final successful build; do not add a generated-file cleanup to this branch.
+- Treat colocated generated `.js` and `.d.ts` files as ignored build artifacts. TypeScript is the source of truth; do not stage generated outputs.
 
 ---
 
@@ -162,17 +162,15 @@ git commit -m "test(stack): repair public stack fixture"
 
 Expected: one test-only commit; `.ai/` and `.claude/` remain untracked.
 
-### Task 3: Add ASG regression coverage and capacity headroom
+### Task 3: Add ASG regression coverage, capacity headroom, and rolling migration
 
 **Files:**
 - Modify: `test/miwkey-public.test.ts`
 - Modify: `lib/miwkey-public-stack.ts`
-- Modify after build: `test/miwkey-public.test.js`
-- Modify after build: `lib/miwkey-public-stack.js`
 
 **Interfaces:**
-- Consumes: `createTemplate(): Template` from Task 2 and CDK `Match.arrayWith()` / `Match.objectLike()` assertions.
-- Produces: `AWS::AutoScaling::AutoScalingGroup.MaxSize = "4"` while preserving ECS desired count, placement, and Spot pool properties.
+- Consumes: `createTemplate(): Template` from Task 2, CDK assertions, and `UpdatePolicy.rollingUpdate()`.
+- Produces: `AWS::AutoScaling::AutoScalingGroup.MaxSize = "4"` and a top-level rolling `UpdatePolicy` while preserving ECS desired count, placement, and Spot pool properties.
 
 - [ ] **Step 1: Add synthesized-template regression tests**
 
@@ -187,6 +185,20 @@ test('ASG has capacity for redundant tasks and replacement headroom', () => {
   });
 });
 
+test('ASG rolls launch template migration without dropping all instances', () => {
+  const template = createTemplate();
+
+  template.hasResource('AWS::AutoScaling::AutoScalingGroup', {
+    UpdatePolicy: {
+      AutoScalingRollingUpdate: {
+        MaxBatchSize: 1,
+        MinInstancesInService: 1,
+        PauseTime: 'PT5M'
+      }
+    }
+  });
+});
+
 test('ASG uses diversified capacity-optimized Spot pools', () => {
   const template = createTemplate();
 
@@ -198,7 +210,7 @@ test('ASG uses diversified capacity-optimized Spot pools', () => {
         SpotAllocationStrategy: 'capacity-optimized'
       }),
       LaunchTemplate: Match.objectLike({
-        Overrides: Match.arrayWith([
+        Overrides: Match.arrayEquals([
           { InstanceType: 't4g.small' },
           { InstanceType: 't4g.medium' },
           { InstanceType: 'm6g.medium' },
@@ -216,17 +228,17 @@ test('ECS keeps two tasks on distinct container instances', () => {
 
   template.hasResourceProperties('AWS::ECS::Service', {
     DesiredCount: 2,
-    PlacementConstraints: Match.arrayWith([
+    PlacementConstraints: Match.arrayEquals([
       { Type: 'distinctInstance' }
     ]),
-    PlacementStrategies: Match.arrayWith([
+    PlacementStrategies: Match.arrayEquals([
       { Field: 'MEMORY', Type: 'binpack' }
     ])
   });
 });
 ```
 
-- [ ] **Step 2: Run the tests and confirm the capacity regression fails**
+- [ ] **Step 2: Run the tests and confirm the regressions fail**
 
 Run:
 
@@ -234,16 +246,22 @@ Run:
 mise exec -- npm test -- --runInBand
 ```
 
-Expected: three tests pass and `ASG has capacity for redundant tasks and replacement headroom` fails because the synthesized `MaxSize` is `"1"`, not `"4"`.
+Expected: the new capacity assertion fails while `MaxSize` is `"1"`, and the rolling migration assertion fails while `AutoScalingRollingUpdate` is absent. Confirm both failures before changing production code.
 
-- [ ] **Step 3: Set the ASG maximum capacity**
+- [ ] **Step 3: Set the ASG maximum capacity and rolling migration policy**
 
-In the `new AutoScalingGroup(this, "miwkeyASG", ...)` properties, add `maxCapacity` immediately after `capacityRebalance`:
+In the `new AutoScalingGroup(this, "miwkeyASG", ...)` properties, add the capacity and migration settings immediately after `capacityRebalance`:
 
 ```typescript
 capacityRebalance: true,
 // Two steady-state instances plus room for rolling replacement and Spot rebalance.
 maxCapacity: 4,
+migrateToLaunchTemplate: true,
+updatePolicy: UpdatePolicy.rollingUpdate({
+  maxBatchSize: 1,
+  minInstancesInService: 1,
+  pauseTime: Duration.minutes(5)
+}),
 vpcSubnets: subnetSelection,
 ```
 
@@ -255,11 +273,11 @@ Run:
 mise exec -- npm test -- --runInBand
 mise exec -- npx tsc --noEmit
 mise exec -- npm run build
-mise exec -- npm run synth -- --quiet
+mise exec -- npm run synth -- --quiet --output <fresh /tmp path>
 git diff --check
 ```
 
-Expected: Jest reports `4 passed, 4 total`; TypeScript, build, synth, and diff checks all exit zero. The build updates the tracked JavaScript files to match their TypeScript sources.
+Expected: Jest, TypeScript, build, synth, and diff checks all exit zero. Build outputs remain ignored; the TypeScript sources contain the persistent change.
 
 - [ ] **Step 5: Review and commit the capacity fix with its regression tests**
 
@@ -267,13 +285,13 @@ Run:
 
 ```bash
 git status --short
-git diff -- lib/miwkey-public-stack.ts lib/miwkey-public-stack.js test/miwkey-public.test.ts test/miwkey-public.test.js
-git add lib/miwkey-public-stack.ts lib/miwkey-public-stack.js test/miwkey-public.test.ts test/miwkey-public.test.js
+git diff -- lib/miwkey-public-stack.ts test/miwkey-public.test.ts
+git add lib/miwkey-public-stack.ts test/miwkey-public.test.ts
 git diff --cached --check
-git commit -m "fix(ecs): allow redundant task placement"
+git commit -m "fix(asg): add safe launch template migration"
 ```
 
-Expected: the commit contains `maxCapacity: 4`, the three ASG/ECS regression tests, and synchronized tracked JavaScript. It does not contain `.ai/`, `.claude/`, dependency upgrades, Managed Instances, or WARP changes.
+Expected: the commit contains `maxCapacity: 4`, safe launch template migration, and the ASG/ECS regression tests. It does not contain generated JavaScript, `.ai/`, `.claude/`, dependency upgrades, Managed Instances, or WARP changes.
 
 ### Task 4: Validate the deployable branch and create the extension infrastructure branch
 
@@ -292,22 +310,22 @@ Run:
 mise exec -- npm ci
 mise exec -- npm test -- --runInBand
 mise exec -- npm run build
-mise exec -- npm run synth -- --quiet
+mise exec -- npm run synth -- --quiet --output <fresh /tmp path>
 git status --short --branch
 ```
 
-Expected: installation, four tests, build, and synth succeed. Status lists only the existing untracked `.ai/` and `.claude/` directories.
+Expected: installation, tests, build, and synth succeed. Status lists only the existing untracked `.ai/` and `.claude/` directories.
 
-- [ ] **Step 2: Attempt a read-only deployment diff**
+- [ ] **Step 2: Complete the mandatory pre-deployment cloud diff**
 
 Run:
 
 ```bash
-mise exec -- aws sts get-caller-identity --profile agent-readonly
-mise exec -- npx cdk diff MiwkeyPublicStack --profile agent-readonly
+mise exec -- aws sts get-caller-identity --profile "$CDK_LOOKUP_PROFILE"
+mise exec -- npx cdk diff MiwkeyPublicStack --profile "$CDK_LOOKUP_PROFILE"
 ```
 
-Expected: STS identifies the configured account. If ViewOnlyAccess permits all reads required by CDK, the diff shows the ASG, launch template, IAM role, and ECS placement changes without deploying them. A denied read is recorded as an IAM limitation and does not replace the required local synthesis and assertion checks.
+Expected: `CDK_LOOKUP_PROFILE` identifies credentials that can assume the environment's CDK lookup role, and the diff shows the ASG, launch template, IAM role, ECS placement, and rolling update changes without deploying them. A successful cloud diff is a mandatory pre-deployment gate. The current `agent-readonly` ViewOnly profile did not complete this gate and must not be cited as satisfying it.
 
 - [ ] **Step 3: Audit the final history and branch contents**
 
@@ -321,14 +339,12 @@ git diff --check develop...feature/asg-stabilization
 
 Expected: history contains the AWS design document, the two restored ASG commits, the test fixture repair, and the capacity fix. The diff contains no full-refactor-only files or changes.
 
-- [ ] **Step 4: Create the next branch without adding implementation**
+- [ ] **Step 4: Let the controller create the next branch after final re-review**
 
 Run:
 
 ```bash
-git switch -c feature/notification-extension-infra
 git rev-parse feature/asg-stabilization
-git rev-parse feature/notification-extension-infra
 ```
 
-Expected: both hashes are identical. The new branch contains no notification extension infrastructure changes yet and is ready for the separate implementation session.
+Expected: this implementation session leaves `feature/notification-extension-infra` untouched. After final re-review passes, the controller moves that branch to the verified `feature/asg-stabilization` tip without adding notification infrastructure in this fix.

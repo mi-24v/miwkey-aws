@@ -55,12 +55,19 @@ runtime and test changes:
 - the existing changes from `67024a6` and `e9f190e`
 - the test setup repair needed to instantiate `MiwkeyPublicStack`
 - `maxCapacity: 4`
+- migration from the existing launch configuration to the launch template with
+  `migrateToLaunchTemplate: true`
+- a rolling update policy with a maximum batch size of one, at least one
+  instance in service, and a five-minute pause
 - regression assertions for ASG `MaxSize`, ECS `DesiredCount`, the
   `distinctInstance` placement constraint, the six Spot instance types, and
   the `capacity-optimized` allocation strategy
+- a synthesized-template assertion for top-level
+  `UpdatePolicy.AutoScalingRollingUpdate`
 
-It does not contain the CDK upgrade, Managed Instances design, WARP PoC, or the
-full-refactor `.gitignore` changes.
+Repository tooling pins only the `aws-cdk` CLI to `2.1132.0`; `aws-cdk-lib`
+remains on 2.217.x. The branch does not contain a CDK library upgrade, Managed
+Instances design, WARP PoC, or the full-refactor `.gitignore` changes.
 
 Create `feature/notification-extension-infra` from the completed
 `feature/asg-stabilization` tip. Keep `feature/full-refactor` at its current
@@ -248,7 +255,8 @@ are deployment-time values.
 
 ## 9. Deployment Order
 
-1. Merge and deploy `feature/asg-stabilization` by itself.
+1. Complete a cloud diff with credentials able to assume the CDK lookup role,
+   then merge and deploy `feature/asg-stabilization` by itself.
 2. Verify that two Misskey tasks remain placed on distinct instances and that
    Spot replacement works with the diversified pools.
 3. Complete the `miwkey-extension` cross-repository contract.
@@ -283,10 +291,14 @@ are deployment-time values.
 - TypeScript build passes.
 - Jest passes.
 - Synthesized ASG has `MaxSize: 4`.
+- Synthesized ASG has top-level `UpdatePolicy.AutoScalingRollingUpdate` with
+  `MaxBatchSize: 1`, `MinInstancesInService: 1`, and `PauseTime: PT5M`.
 - Main ECS service has `DesiredCount: 2`.
 - The service uses `distinctInstance`.
 - The ASG contains all six intended Graviton instance types.
 - Spot allocation uses `capacity-optimized`.
+- A cloud diff with credentials able to assume the CDK lookup role succeeds
+  before deployment. The current ViewOnly profile has not completed this gate.
 
 ### Notification extension infrastructure branch
 
