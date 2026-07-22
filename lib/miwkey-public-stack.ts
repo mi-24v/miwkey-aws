@@ -27,7 +27,7 @@ import {
 } from "aws-cdk-lib/aws-ecs";
 import {ApplicationLoadBalancer, IpAddressType} from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import {miwkeyConfigMountPoint, miwkeyMainTaskDefinition, miwkeyMigrationTaskDefinition} from "./taskdef";
-import {AutoScalingGroup, SpotAllocationStrategy} from "aws-cdk-lib/aws-autoscaling";
+import {AutoScalingGroup, SpotAllocationStrategy, UpdatePolicy} from "aws-cdk-lib/aws-autoscaling";
 import {meilisearchDNSRecord} from "./meilisearch/meilisearch-miwkey";
 import {ManagedPolicy, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 
@@ -156,6 +156,12 @@ export class MiwkeyPublicStack extends Stack {
                 capacityRebalance: true,
                 // Two steady-state instances plus room for rolling replacement and Spot rebalance.
                 maxCapacity: 4,
+                migrateToLaunchTemplate: true,
+                updatePolicy: UpdatePolicy.rollingUpdate({
+                    maxBatchSize: 1,
+                    minInstancesInService: 1,
+                    pauseTime: Duration.minutes(5)
+                }),
                 vpcSubnets: subnetSelection,
                 vpc: props.mainVpc,
                 // 単一インスタンスタイプ(t4g.small)の100% Spotだと、そのAZ/タイプのプールが

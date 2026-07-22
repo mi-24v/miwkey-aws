@@ -48,6 +48,20 @@ test('ASG has capacity for redundant tasks and replacement headroom', () => {
   });
 });
 
+test('ASG rolls launch template migration without dropping all instances', () => {
+  const template = createTemplate();
+
+  template.hasResource('AWS::AutoScaling::AutoScalingGroup', {
+    UpdatePolicy: {
+      AutoScalingRollingUpdate: {
+        MaxBatchSize: 1,
+        MinInstancesInService: 1,
+        PauseTime: 'PT5M'
+      }
+    }
+  });
+});
+
 test('ASG uses diversified capacity-optimized Spot pools', () => {
   const template = createTemplate();
 
@@ -77,10 +91,10 @@ test('ECS keeps two tasks on distinct container instances', () => {
 
   template.hasResourceProperties('AWS::ECS::Service', {
     DesiredCount: 2,
-    PlacementConstraints: Match.arrayWith([
+    PlacementConstraints: Match.arrayEquals([
       { Type: 'distinctInstance' }
     ]),
-    PlacementStrategies: Match.arrayWith([
+    PlacementStrategies: Match.arrayEquals([
       { Field: 'MEMORY', Type: 'binpack' }
     ])
   });
