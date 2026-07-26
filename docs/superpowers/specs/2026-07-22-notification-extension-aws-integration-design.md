@@ -1,6 +1,7 @@
 # miwkey-extension AWS Integration Design
 
 - Date: 2026-07-22
+- Updated: 2026-07-27
 - Status: Approved for implementation
 - Repositories: `miwkey-aws`, `miwkey-extension`, `miwkey-notification-importer`
 
@@ -57,8 +58,8 @@ runtime and test changes:
 - `maxCapacity: 4`
 - migration from the existing launch configuration to the launch template with
   `migrateToLaunchTemplate: true`
-- a rolling update policy with a maximum batch size of one, at least one
-  instance in service, and a five-minute pause
+- a rolling update policy with a maximum batch size of one, at least two
+  instances in service, and a five-minute pause
 - regression assertions for ASG `MaxSize`, ECS `DesiredCount`, the
   `distinctInstance` placement constraint, the six Spot instance types, and
   the `capacity-optimized` allocation strategy
@@ -74,6 +75,13 @@ Create `feature/notification-extension-infra` from the completed
 commit. After both smaller branches are merged, rebase `feature/full-refactor`
 onto the updated `develop` and drop the now-duplicate max-capacity and test
 setup changes.
+
+The notification extension branch changes the ASG Spot allocation strategy
+from `capacity-optimized` to `price-capacity-optimized`. The strategy applies
+to future instance launches. Do not start an Instance Refresh or deliberately
+replace the existing instances as part of this branch; they remain until a
+normal scaling, health replacement, Spot interruption, or capacity rebalance
+event launches replacements.
 
 ## 4. Runtime Architecture
 
@@ -259,15 +267,18 @@ are deployment-time values.
    then merge and deploy `feature/asg-stabilization` by itself.
 2. Verify that two Misskey tasks remain placed on distinct instances and that
    Spot replacement works with the diversified pools.
-3. Complete the `miwkey-extension` cross-repository contract.
-4. Merge `feature/notification-extension-infra`.
-5. Deploy with a known public multi-architecture `sha-<commit>` image tag.
-6. Verify two healthy extension tasks and authenticated access through an SSM
+3. Complete the `miwkey-extension` cross-repository contract and change the ASG
+   Spot allocation strategy to `price-capacity-optimized`.
+4. Confirm the Change Set updates the existing ASG in place and does not
+   initiate an Instance Refresh.
+5. Merge `feature/notification-extension-infra`.
+6. Deploy with a known public multi-architecture `sha-<commit>` image tag.
+7. Verify two healthy extension tasks and authenticated access through an SSM
    tunnel.
-7. In a separate change, deploy the Misskey 2025 image that consumes the URL
+8. In a separate change, deploy the Misskey 2025 image that consumes the URL
    and secret environment variables.
-8. Perform the rehearsed notification import and verify migrated IDs.
-9. Rebase and continue `feature/full-refactor` only after the two smaller
+9. Perform the rehearsed notification import and verify migrated IDs.
+10. Rebase and continue `feature/full-refactor` only after the two smaller
    branches are merged and stable.
 
 ## 10. Failure and Rollback
@@ -297,8 +308,8 @@ are deployment-time values.
 - The service uses `distinctInstance`.
 - The ASG contains all six intended Graviton instance types.
 - Spot allocation uses `capacity-optimized`.
-- A cloud diff with credentials able to assume the CDK lookup role succeeds
-  before deployment. The current ViewOnly profile has not completed this gate.
+- The Change Set was reviewed with credentials able to perform the required
+  CloudFormation operations, and the ASG branch deployment completed.
 
 ### Notification extension infrastructure branch
 
@@ -311,6 +322,8 @@ are deployment-time values.
   Connect.
 - The Misskey service is a client and depends on the server service creation.
 - The extension service runs two tasks on distinct instances.
+- Spot allocation uses `price-capacity-optimized`.
+- The ASG update does not replace the group or initiate an Instance Refresh.
 - No extension ALB, public listener, or public DNS record exists.
 - Application and Service Connect logs use separate six-month log groups.
 - Service Connect request access logging is disabled.
@@ -321,3 +334,5 @@ are deployment-time values.
 - [Service Connect configuration overview](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-connect-concepts.html)
 - [Service Connect components and bridge networking](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-connect-concepts-deploy.html)
 - [Connecting ECS services inside a VPC](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/networking-connecting-services.html)
+- [Auto Scaling allocation strategies](https://docs.aws.amazon.com/autoscaling/ec2/userguide/allocation-strategies.html)
+- [Updating an Auto Scaling group](https://docs.aws.amazon.com/autoscaling/ec2/userguide/update-auto-scaling-group.html)
