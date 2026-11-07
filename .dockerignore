@@ -1,0 +1,12 @@
+**
+!package.json
+!package-lock.json
+!lambda/extension-cert-issuer/package.json
+!lambda/extension-cert-issuer/tsconfig.json
+!lambda/extension-cert-issuer/Dockerfile
+!lambda/extension-cert-issuer/src/**
+!lambda/extension-cert-issuer/public-roots.pem
+!lambda/extension-cert-issuer/staging-roots.pem
+!lambda/extension-cert-issuer/trust.json
+!lambda/extension-cert-issuer/runtime-pins.json
+!vendor/acme-client-native/acme-client-native-5.4.0-miwkey.1.tgz

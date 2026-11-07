@@ -1,0 +1,14 @@
+{
+  "directory": "https://acme-v02.api.letsencrypt.org/directory",
+  "key": {
+    "n": "u9J3dafvlGi5OWgf-NcN_zODwR5_ErwP1aQaVMFA32ppyUUsRe6uhYYfOGBvLMrZD_7pwapGP5Dn0QEWRGtaAOnj8pLsQgaVzNpqQWuitpFYJjEf_SieTCxZHeIu4ZaXYpSoMb93feu7NShguVna4hvOnkaA5SKezSjJqibQL40HP4-V9gKsZHQhe6R8szV-kvapB2pVBEXDT93K7MUPmrCKSHAL9-8BTw9A9_eEubg4NdFkVcgDHk8Ct_doQhchq_KGqcNDhQbkOeZ6l4LUR9q18Yr-ajifjBjIv5sk-SVWxov8Ue3AMexf_YmSNHROqttyxkG3GVF8Y3LwkfiNqw",
+    "e": "AQAB",
+    "d": "PzYrt0DQTHHcWLo2_HAgSVHkl1O0r7D0YVIL_JdXxnlRZgguSND2EoEbs8Uc1YXlfNEtidzNLKqPolNL07YPgfw1l9ejxOrjcqDVnvPjPK94682ftvt7HybTzU9ouMqOY4KlgqyuQgZaqJ7QwsC_flaeeL1Atx0qNeDy0h2i9kVbqrr2fHtlSfNGUs3slIc05MOQt9mDZF0Z0Vo9Ow4kAt3c6nXYvYgErAn3KZt5KmU3OTwJlJbYRY1Qeaj6gP8cgoTSVjG03OfG0_TjgrJRkeMJ1e_0eceyDvOQ9CaEtOVjeHZBH7mXD2f3lWjJoG3OFW4Eq_3XZ5hj3HhTgsu_sQ",
+    "p": "8d9MjqpKVnDeorWLlZPFHJ71K1RJw0eou3i3zMxlH9y9UM0fdYRUZU-AHELPISUEmEiJ2YJ9kdS-v36vx5vlyrJkNd3om4YY2-xveh7bI2wB67-umCUGWQpoJSf0YxX49ljZovXLytYQtN60Wg8YliT4GeLXolTQFtveshFB7ts",
+    "q": "xsr1mr2ElbPJrNPlBF23aOxYkcS4VvB7sco6ymj4Lc1afBr6MqF8yi4bC-XVhtBoO6KciI-D4o6TOk3tq0T8ipxi4TdsVdNuwJJFlN2uNHCeUDu9lEyWeIvrc1dnVEas3OAv2wXUYfkXfprcrpInM3N8FR-Tqa4xuVGnINRHDXE",
+    "dp": "COA96fpb0gJAWU46Ohn7IMrAin-EWXM2wPJ0JELX7yxlkiKE5gYeJr2dIOxet4OpQIFg9adxPjnFajeW8cdJzn9vZ_6lu5dXMDLkAGJDfnBHPcSB_rlVG01jdwGZWU2EHl4yVmWYve_PGyQVEDz_lPr0U9bcPOvJ2xzkdjpl5gM",
+    "dq": "TnTBk-2iCxcmzB_greVywmUs23LhMea9WsCujT36XNFEGeDnx922C3FA2WQ-7nMIAClAUCEb8ulEL-mbmFGkvevUloAyMHk-p5_S-Fq5KxcbVB0PyByl8jN-nEntjPRLuux71pwpYvVVEXF7ESa7c_HrEcchlwEZvML-C9XbqPE",
+    "qi": "2mPw8xCqVPq6dPOgYRVY1iDrnsU3P8s1RSzryKLcJsA40sr3FLhlKSoYj2YJvgnYF1LsWcqCMyUgRLcRl-GRX-RTJ6JQiwKqHVYgrUis_E5XdlcDfJCErX5H8TpgeWFwEA0CgDQDQP9by3kBOI3oy83tyBwTr67hzAH-3cyjsDI"
+  },
+  "account_url": "https://acme-v02.api.letsencrypt.org/acme/acct/123456"
+}

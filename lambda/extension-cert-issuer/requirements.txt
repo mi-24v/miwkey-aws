@@ -1,0 +1,15 @@
+boto3==1.43.114
+botocore==1.43.114
+certifi==2026.7.22
+cffi==2.1.1
+cryptography==50.0.2
+dnspython==2.9.0
+gufo_acme==0.7.0
+gufo_http==0.7.0
+jmespath==1.1.0
+josepy==2.2.0
+pycparser==3.11
+python-dateutil==2.9.0.post0
+s3transfer==0.19.2
+six==1.17.0
+urllib3==2.8.0

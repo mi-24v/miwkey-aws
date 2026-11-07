@@ -1,0 +1,30 @@
+{
+  "name": "@miwkey/extension-cert-issuer",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/test/*.test.js"
+  },
+  "dependencies": {
+    "@peculiar/x509": "1.14.2",
+    "@aws-sdk/client-ecs": "3.1152.0",
+    "@aws-sdk/client-secrets-manager": "3.1152.0",
+    "@aws-sdk/client-ssm": "3.1152.0",
+    "@aws-sdk/client-cloudformation": "3.1152.0",
+    "@aws-sdk/client-cloudwatch": "3.1152.0",
+    "@aws-sdk/client-cloudwatch-logs": "3.1152.0",
+    "@smithy/node-http-handler": "4.12.1",
+    "acme-client": "file:../../vendor/acme-client-native/acme-client-native-5.4.0-miwkey.1.tgz",
+    "debug": "4.4.3",
+    "@peculiar/asn1-schema": "2.11.0",
+    "@peculiar/asn1-x509": "2.11.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "24.10.0"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "acme-client",
+  "version": "5.4.0",
+  "gitHead": "9f293d2e00b70c10a464628703713141ca593b0f",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/publishlab/node-acme-client.git"
+  },
+  "dist": {
+    "integrity": "sha512-mORqg60S8iML6XSmVjqjGHJkINrCGLMj2QvDmFzI9vIlv1RGlyjmw3nrzaINJjkNsYXC41XhhD5pfy7CtuGcbA==",
+    "shasum": "989e0625c3ff916d16fb7d7377035e80565aa635",
+    "tarball": "https://registry.npmjs.org/acme-client/-/acme-client-5.4.0.tgz",
+    "fileCount": 17,
+    "unpackedSize": 117245,
+    "signatures": [
+      {
+        "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA",
+        "sig": "MEYCIQDzjfcvlrwKzggNTHgPeoZw0C8/3oHTLyP9T4eD0DxVdgIhAO4Z9RzvN7tNrmt1T7GwCW6yC2YQHfBfGpfhpxxY9t6g"
+      }
+    ]
+  }
+}

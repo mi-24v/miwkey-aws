@@ -1,0 +1,72 @@
+{
+  "upstream": {
+    "name": "acme-client",
+    "version": "5.4.0",
+    "gitHead": "9f293d2e00b70c10a464628703713141ca593b0f",
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/publishlab/node-acme-client.git"
+    },
+    "dist": {
+      "integrity": "sha512-mORqg60S8iML6XSmVjqjGHJkINrCGLMj2QvDmFzI9vIlv1RGlyjmw3nrzaINJjkNsYXC41XhhD5pfy7CtuGcbA==",
+      "shasum": "989e0625c3ff916d16fb7d7377035e80565aa635",
+      "tarball": "https://registry.npmjs.org/acme-client/-/acme-client-5.4.0.tgz",
+      "fileCount": 17,
+      "unpackedSize": 117245,
+      "signatures": [
+        {
+          "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA",
+          "sig": "MEYCIQDzjfcvlrwKzggNTHgPeoZw0C8/3oHTLyP9T4eD0DxVdgIhAO4Z9RzvN7tNrmt1T7GwCW6yC2YQHfBfGpfhpxxY9t6g"
+        }
+      ]
+    }
+  },
+  "name": "@miwkey/acme-client-native",
+  "version": "5.4.0-miwkey.1",
+  "license": "MIT",
+  "filename": "acme-client-native-5.4.0-miwkey.1.tgz",
+  "integrity": "sha512-ID3Dv56MeN2RJfNjQfERqOh31bYJnUW4JteaI0d1wpP3aIPyTWgrsYfXg1wWDOg90a6OHYYafcq/zednVHa/CA==",
+  "sha256": "5575b0d99939b23c1467118dcf7059e167c892cabc9322ab1fd218d0fe012e4e",
+  "changes": [
+    "private package identity",
+    "remove node-forge dependency",
+    "remove unused legacy forge export and type interface",
+    "remove src/crypto/forge.js; all other source files unchanged"
+  ],
+  "filesSha256": {
+    "LICENSE": "ec18bd68901899a408635e2edf60d54a07ebf87cbfc48ddb23fd1c3b82092b75",
+    "README.md": "54cc6e26e28fbe8f9fd955a26f8d51343042813e98cc300e13f3a2d3e97d4fd0",
+    "package.json": "1de67e89bd8788665be5ea08cf69d37025e0007132507e1a30d5a97e7a77120d",
+    "src/api.js": "a989be02fbedb30f3893b8af2f43b5a56cc4c70244a82531d84f7687a77e2c47",
+    "src/auto.js": "9ac11e26ca37fa98127f3fd2d367fbd6196f2ef6a87d3603f1255989de71c4fc",
+    "src/axios.js": "b542d879b99007f3d65ea43e8907bc9698514cdd98d9ebcd06e1fac14abe8f4c",
+    "src/client.js": "16223e03cc8565a06736b18916867b408bf8d66078d66c299a3212d298008302",
+    "src/crypto/index.js": "7b03fc03b2d3d7b75a7e77dfa5e5af9c8b7825bb2154e2baff3fa4b2615e6c44",
+    "src/http.js": "93358bcde8ae34fcc8a4e092a6ea2470cb50e6a0d3db838c8e5a7ed197b2a91a",
+    "src/index.js": "952da2142f4d081dac07816a3792305d05a381c3bb4321e2611062b7dc629dbf",
+    "src/logger.js": "a3ec624f417cd84e522c1f1a2584fca7a34599466cb067bacfd9f549c7e9fc7a",
+    "src/util.js": "caf2b67e44ab4a41b308843b73ff96c148f50202130df4a2cfa83c20999e8b77",
+    "src/verify.js": "a4b79ba1505736c6f26c01bc7b617ed64810264caed6cfca831b37fef6bd11c9",
+    "types/index.d.ts": "15eab7ae03b87e94f37eb7020f7ad926eac24ba7e3e3735daaa80d45a585ffd9",
+    "types/index.test-d.ts": "6e426e7a7bddc80e0ce8f4156b1771afb6ef39fc867626c349a44cbc03375e39",
+    "types/rfc8555.d.ts": "81a197dd91c64bfdc23f235ea54073bfcadac65dde7b2517161c91f210f37721"
+  },
+  "unchangedFiles": [
+    "LICENSE",
+    "README.md",
+    "src/api.js",
+    "src/auto.js",
+    "src/axios.js",
+    "src/client.js",
+    "src/crypto/index.js",
+    "src/http.js",
+    "src/logger.js",
+    "src/util.js",
+    "src/verify.js",
+    "types/index.test-d.ts",
+    "types/rfc8555.d.ts"
+  ],
+  "removedFiles": [
+    "src/crypto/forge.js"
+  ]
+}
