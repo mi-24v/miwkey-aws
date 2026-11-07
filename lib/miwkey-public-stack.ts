@@ -14,7 +14,7 @@ import {
     PostgresEngineVersion,
     StorageType
 } from "aws-cdk-lib/aws-rds";
-import {InstanceClass, InstanceSize, InstanceType, SubnetSelection} from "aws-cdk-lib/aws-ec2";
+import {InstanceClass, InstanceSize, InstanceType, LaunchTemplate, SubnetSelection, UserData} from "aws-cdk-lib/aws-ec2";
 import {ApplicationLoadBalancedEc2Service} from "aws-cdk-lib/aws-ecs-patterns";
 import {
     AmiHardwareType,
@@ -22,12 +22,14 @@ import {
     Cluster,
     ContainerDependencyCondition,
     EcsOptimizedImage,
+    PlacementConstraint,
     PlacementStrategy
 } from "aws-cdk-lib/aws-ecs";
 import {ApplicationLoadBalancer, IpAddressType} from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import {miwkeyConfigMountPoint, miwkeyMainTaskDefinition, miwkeyMigrationTaskDefinition} from "./taskdef";
-import {AutoScalingGroup} from "aws-cdk-lib/aws-autoscaling";
+import {AutoScalingGroup, SpotAllocationStrategy, UpdatePolicy} from "aws-cdk-lib/aws-autoscaling";
 import {meilisearchDNSRecord} from "./meilisearch/meilisearch-miwkey";
+import {ManagedPolicy, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 
 export class MiwkeyPublicStack extends Stack {
     constructor(scope: Construct, id: string, props: MiwkeyPublicStackProps) {
@@ -129,16 +131,60 @@ export class MiwkeyPublicStack extends Stack {
             containerInsights: true,
             vpc: props.mainVpc
         });
+        // mixedInstancesPolicyを使う場合、machineImage/instanceType/securityGroup/role等の
+        // launch configuration系プロパティはAutoScalingGroupに直接渡せないため、
+        // 明示的なLaunchTemplateを用意する必要がある
+        const miwkeyAsgInstanceRole = new Role(this, "miwkeyAsgInstanceRole", {
+            assumedBy: new ServicePrincipal("ec2.amazonaws.com")
+        });
+        // AutoScalingGroupPropsのssmSessionPermissionsに相当する権限を明示的に付与する
+        miwkeyAsgInstanceRole.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore"));
+        // userDataを明示的に持たせないと、addAsgCapacityProviderがECS_CLUSTERを
+        // 注入しようとした際に「launch template does not expose its user data」でsynthが失敗する
+        const miwkeyAsgUserData = UserData.forLinux();
+        // spotInstanceDraining: trueによるECS_ENABLE_SPOT_INSTANCE_DRAINING注入は
+        // ASGのspotPriceプロパティ設定時のみ動作し、mixedInstancesPolicyでは効かないため明示する
+        miwkeyAsgUserData.addCommands("echo ECS_ENABLE_SPOT_INSTANCE_DRAINING=true >> /etc/ecs/ecs.config");
+        const miwkeyAsgLaunchTemplate = new LaunchTemplate(this, "miwkeyAsgLaunchTemplate", {
+            machineImage: EcsOptimizedImage.amazonLinux2(AmiHardwareType.ARM),
+            securityGroup: props.defaultSG,
+            role: miwkeyAsgInstanceRole,
+            userData: miwkeyAsgUserData
+        });
         const miwkeyMainAsgCapacityProvider = new AsgCapacityProvider(this, "miwkeyAsgCapacityProvider", {
             autoScalingGroup: new AutoScalingGroup(this, "miwkeyASG", {
-                instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL),
                 capacityRebalance: true,
-                machineImage: EcsOptimizedImage.amazonLinux2(AmiHardwareType.ARM),
-                securityGroup: props.defaultSG,
-                spotPrice: "0.015", // 10.8usd/mo
-                ssmSessionPermissions: true,
+                // Two steady-state instances plus room for rolling replacement and Spot rebalance.
+                maxCapacity: 4,
+                migrateToLaunchTemplate: true,
+                updatePolicy: UpdatePolicy.rollingUpdate({
+                    maxBatchSize: 1,
+                    minInstancesInService: 2,
+                    pauseTime: Duration.minutes(5)
+                }),
                 vpcSubnets: subnetSelection,
-                vpc: props.mainVpc
+                vpc: props.mainVpc,
+                // 単一インスタンスタイプ(t4g.small)の100% Spotだと、そのAZ/タイプのプールが
+                // 枯渇した際に何時間も代替インスタンスを起動できなくなることが確認されたため、
+                // Graviton系の複数インスタンスタイプへSpotプールを分散させる
+                mixedInstancesPolicy: {
+                    launchTemplate: miwkeyAsgLaunchTemplate,
+                    launchTemplateOverrides: [
+                        {instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL)},
+                        {instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.MEDIUM)},
+                        {instanceType: InstanceType.of(InstanceClass.M6G, InstanceSize.MEDIUM)},
+                        {instanceType: InstanceType.of(InstanceClass.M7G, InstanceSize.MEDIUM)},
+                        {instanceType: InstanceType.of(InstanceClass.C6G, InstanceSize.MEDIUM)},
+                        {instanceType: InstanceType.of(InstanceClass.C7G, InstanceSize.MEDIUM)}
+                    ],
+                    instancesDistribution: {
+                        onDemandBaseCapacity: 0,
+                        onDemandPercentageAboveBaseCapacity: 0, // 100% Spot
+                        // 価格最安の単一プールに寄せるlowest-priceではなく、
+                        // 空き容量に応じてプールを選ぶcapacity-optimizedで在庫枯渇を回避する
+                        spotAllocationStrategy: SpotAllocationStrategy.CAPACITY_OPTIMIZED
+                    }
+                }
             }),
             enableManagedDraining: true,
             enableManagedScaling: true,
@@ -164,6 +210,7 @@ export class MiwkeyPublicStack extends Stack {
             },
             cpu: 1024,
             desiredCount: 2,
+            minHealthyPercent: 100,
             memoryReservationMiB: 1100,
             enableECSManagedTags: true,
             enableExecuteCommand: false,
@@ -175,8 +222,11 @@ export class MiwkeyPublicStack extends Stack {
                 securityGroup: props.loadBalancerSG
             }),
             openListener: false,
+            placementConstraints: [
+                PlacementConstraint.distinctInstances()
+            ],
             placementStrategies: [
-                PlacementStrategy.spreadAcrossInstances()
+                PlacementStrategy.packedByMemory()
             ],
             redirectHTTP: true,
             taskImageOptions: miwkeyMainTaskDefinition()
