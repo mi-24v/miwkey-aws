@@ -1,4 +1,4 @@
-import {aws_ec2, RemovalPolicy, Stack} from "aws-cdk-lib";
+import {aws_ec2, Fn, RemovalPolicy, Stack} from "aws-cdk-lib";
 import {Construct} from "constructs";
 import {
     AclCidr,
@@ -7,12 +7,15 @@ import {
     CfnInternetGateway,
     CfnVPCPeeringConnection,
     CommonNetworkAclEntryOptions,
+    IpProtocol,
+    Ipv6Addresses,
     NetworkAcl,
     Peer,
     Port,
     RouterType,
     SecurityGroup,
     Subnet,
+    SubnetType,
     TrafficDirection,
     Vpc
 } from "aws-cdk-lib/aws-ec2";
@@ -103,22 +106,42 @@ export class MiwkeyNetworkStack extends Stack {
 
     constructor(scope: Construct, id: string, props: MiwkeyNetworkStackProps) {
         super(scope, id, props);
+        const ipv6Addresses = Ipv6Addresses.amazonProvided();
 
         this.miwkeyMainVpc = new aws_ec2.Vpc(this, "miwkeyMainVPC", {
+                createInternetGateway: false,
                 ipAddresses: aws_ec2.IpAddresses.cidr(props.ipAddresses.vpcCIDR),
+                ipProtocol: IpProtocol.DUAL_STACK,
+                ipv6Addresses: ipv6Addresses,
                 enableDnsHostnames: true,
                 enableDnsSupport: true,
                 natGateways: 0,
                 vpcName: "miwkey-main",
-                subnetConfiguration: [],
+                subnetConfiguration: [
+                    // subnetConfiguration must contain elements for calling createSubnets
+                    // https://github.com/aws/aws-cdk/blob/92b912d90cfaf9abc2878693224e9cd9d9e79fe4/packages/aws-cdk-lib/aws-ec2/lib/vpc.ts#L1605C8-L1605C68
+                    {
+                        name: "public-stub",
+                        subnetType: SubnetType.PUBLIC,
+                        cidrMask: 28,
+                        ipv6AssignAddressOnCreation: true,
+                        mapPublicIpOnLaunch: false
+                    }
+                ],
             }
         )
         this.miwkeyMainVpc.applyRemovalPolicy(RemovalPolicy.RETAIN)
+        const ipv6CidrBlocks = ipv6Addresses.createIpv6CidrBlocks({
+            ipv6SelectedCidr: Fn.select(0, this.miwkeyMainVpc.vpcIpv6CidrBlocks),
+            subnetCount: 6
+        });
         this.miwkeyMainSubnets = props.ipAddresses.subnetCIDRs.map((s, index) => {
             return new Subnet(this, `miwkey-subnet-${index}`, {
                 availabilityZone: s.region,
                 cidrBlock: s.ip,
                 vpcId: this.miwkeyMainVpc.vpcId,
+                assignIpv6AddressOnCreation: true,
+                ipv6CidrBlock: Fn.select(index + 3, ipv6CidrBlocks), // stubの分を加味しておく
                 mapPublicIpOnLaunch: true // public subnet扱いにさせるため必要
             })
         })
@@ -152,12 +175,14 @@ export class MiwkeyNetworkStack extends Stack {
         this.miwkeyMainSubnets.forEach(subnet => {
             subnet.applyRemovalPolicy(RemovalPolicy.RETAIN)
             subnet.addDefaultInternetRoute(miwkeyMainIGW.attrInternetGatewayId, miwkeyMainIGW)
+            subnet.addIpv6DefaultInternetRoute(miwkeyMainIGW.attrInternetGatewayId)
             subnet.associateNetworkAcl(`net-acl-${subnet.toString()}`, miwkeyNetworkAcl)
         })
 
         this.miwkeyDefaultSG = new SecurityGroup(this, "miwkeyDefaultSG", {
             vpc: this.miwkeyMainVpc,
-            allowAllOutbound: true
+            allowAllOutbound: true,
+            allowAllIpv6Outbound: true
         })
         this.miwkeyDefaultSG.addIngressRule(
             Peer.ipv4(this.miwkeyMainVpc.vpcCidrBlock),
@@ -186,7 +211,8 @@ export class MiwkeyNetworkStack extends Stack {
 
         this.miwkeyLoadBalancerSG = new SecurityGroup(this, "miwkeyLoadBalancerSG", {
             vpc: this.miwkeyMainVpc,
-            allowAllOutbound: true
+            allowAllOutbound: true,
+            allowAllIpv6Outbound: true
         })
         OnlyCloudflareIngressRules.forEach(rule => {
             this.miwkeyLoadBalancerSG.addIngressRule(

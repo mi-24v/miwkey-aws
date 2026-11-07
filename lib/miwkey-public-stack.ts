@@ -7,7 +7,13 @@ import {MiwkeyPublicStackProps} from "./types/stackprops";
 import {FileSystem} from "aws-cdk-lib/aws-efs";
 import {configFSPolicy, miwkeyECSTaskRolePolicy} from "./iam-policies";
 import {CfnCacheCluster} from "aws-cdk-lib/aws-elasticache";
-import {DatabaseInstance, DatabaseInstanceEngine, PostgresEngineVersion, StorageType} from "aws-cdk-lib/aws-rds";
+import {
+    CaCertificate,
+    DatabaseInstance,
+    DatabaseInstanceEngine,
+    PostgresEngineVersion,
+    StorageType
+} from "aws-cdk-lib/aws-rds";
 import {InstanceClass, InstanceSize, InstanceType, SubnetSelection} from "aws-cdk-lib/aws-ec2";
 import {ApplicationLoadBalancedEc2Service} from "aws-cdk-lib/aws-ecs-patterns";
 import {
@@ -18,9 +24,10 @@ import {
     EcsOptimizedImage,
     PlacementStrategy
 } from "aws-cdk-lib/aws-ecs";
-import {ApplicationLoadBalancer} from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import {ApplicationLoadBalancer, IpAddressType} from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import {miwkeyConfigMountPoint, miwkeyMainTaskDefinition, miwkeyMigrationTaskDefinition} from "./taskdef";
 import {AutoScalingGroup} from "aws-cdk-lib/aws-autoscaling";
+import {meilisearchDNSRecord} from "./meilisearch/meilisearch-miwkey";
 
 export class MiwkeyPublicStack extends Stack {
     constructor(scope: Construct, id: string, props: MiwkeyPublicStackProps) {
@@ -42,7 +49,21 @@ export class MiwkeyPublicStack extends Stack {
 
         topic.addSubscription(new subs.SqsSubscription(queue));
 
-        const configFs = new FileSystem(this, "miwkeyConfigFs", {
+        const configFs = this.miwkeyEFS(props, subnetSelection);
+
+        const postQueue = this.miwkeyPostQueue(props);
+
+        const mainDatabase = this.miwkeyMainDB(props, databaseUsername, subnetSelection);
+
+        if (typeof (props.meilisearchInstance) !== "undefined") {
+            meilisearchDNSRecord(this, props.mainVpc, props.meilisearchInstance)
+        }
+
+        this.miwkeyMainCluster(props, subnetSelection, configFs, mainDatabase, postQueue);
+    }
+
+    private miwkeyEFS(props: MiwkeyPublicStackProps, subnetSelection: SubnetSelection) {
+        return new FileSystem(this, "miwkeyConfigFs", {
             vpc: props.mainVpc,
             vpcSubnets: subnetSelection,
             encrypted: true,
@@ -50,7 +71,38 @@ export class MiwkeyPublicStack extends Stack {
             securityGroup: props.defaultSG,
             removalPolicy: RemovalPolicy.DESTROY
         })
+    }
 
+    private miwkeyMainDB(props: MiwkeyPublicStackProps, databaseUsername: CfnParameter, subnetSelection: SubnetSelection) {
+        return new DatabaseInstance(this, "miwkeyMainDB", {
+            engine: DatabaseInstanceEngine.postgres({
+                version: PostgresEngineVersion.of("15.2", "15")
+            }),
+            vpc: props.mainVpc,
+            allocatedStorage: 50, // GiB
+            allowMajorVersionUpgrade: false,
+            autoMinorVersionUpgrade: true,
+            backupRetention: Duration.days(7),
+            caCertificate: CaCertificate.RDS_CA_RDS4096_G1,
+            credentials: {
+                username: databaseUsername.valueAsString
+            },
+            deletionProtection: true,
+            enablePerformanceInsights: true,
+            iamAuthentication: true,
+            instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL),
+            monitoringInterval: Duration.seconds(60),
+            preferredBackupWindow: "18:00-19:00", // 03:00-04:00JST
+            preferredMaintenanceWindow: "tue:23:00-wed:00:00", // wed 08:00-09:00JST
+            publiclyAccessible: false,
+            storageEncrypted: true,
+            securityGroups: [props.defaultSG],
+            storageType: StorageType.GP3,
+            vpcSubnets: subnetSelection
+        });
+    }
+
+    private miwkeyPostQueue(props: MiwkeyPublicStackProps) {
         const queueSubnetGroup = new aws_elasticache.CfnSubnetGroup(this, "miwkeyQueueNetwork", {
             description: "subnet group for miwkey Redis",
             subnetIds: props.mainSubnets.map(s => s.subnetId),
@@ -69,34 +121,10 @@ export class MiwkeyPublicStack extends Stack {
             vpcSecurityGroupIds: [props.defaultSG.securityGroupId]
         })
         postQueue.node.addDependency(queueSubnetGroup)
+        return postQueue;
+    }
 
-        const mainDatabase = new DatabaseInstance(this, "miwkeyMainDB", {
-            engine: DatabaseInstanceEngine.postgres({
-                version: PostgresEngineVersion.of("15.2", "15")
-            }),
-            vpc: props.mainVpc,
-            allocatedStorage: 50, // GiB
-            allowMajorVersionUpgrade: false,
-            autoMinorVersionUpgrade: true,
-            backupRetention: Duration.days(7),
-            credentials: {
-                username: databaseUsername.valueAsString
-            },
-            deletionProtection: true,
-            enablePerformanceInsights: true,
-            iamAuthentication: true,
-            instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL),
-            monitoringInterval: Duration.seconds(60),
-            preferredBackupWindow: "18:00-19:00", // 03:00-04:00JST
-            preferredMaintenanceWindow: "tue:23:00-wed:00:00", // wed 08:00-09:00JST
-            publiclyAccessible: false,
-            storageEncrypted: true,
-            securityGroups: [props.defaultSG],
-            storageType: StorageType.GP3,
-            vpcSubnets: subnetSelection
-        });
-
-
+    private miwkeyMainCluster(props: MiwkeyPublicStackProps, subnetSelection: SubnetSelection, configFs: FileSystem, mainDatabase: DatabaseInstance, postQueue: CfnCacheCluster) {
         const miwkeyMainCluster = new Cluster(this, "miwkeyEcsCluster", {
             containerInsights: true,
             vpc: props.mainVpc
@@ -107,11 +135,12 @@ export class MiwkeyPublicStack extends Stack {
                 capacityRebalance: true,
                 machineImage: EcsOptimizedImage.amazonLinux2(AmiHardwareType.ARM),
                 securityGroup: props.defaultSG,
-                spotPrice: "0.01", // 7.2usd/mo
+                spotPrice: "0.015", // 10.8usd/mo
                 ssmSessionPermissions: true,
                 vpcSubnets: subnetSelection,
                 vpc: props.mainVpc
             }),
+            enableManagedDraining: true,
             enableManagedScaling: true,
             enableManagedTerminationProtection: true
         });
@@ -141,6 +170,7 @@ export class MiwkeyPublicStack extends Stack {
             loadBalancer: new ApplicationLoadBalancer(this, "miwkeyMainLB", {
                 vpc: props.mainVpc,
                 vpcSubnets: subnetSelection,
+                ipAddressType: IpAddressType.DUAL_STACK_WITHOUT_PUBLIC_IPV4,
                 internetFacing: true,
                 securityGroup: props.loadBalancerSG
             }),
