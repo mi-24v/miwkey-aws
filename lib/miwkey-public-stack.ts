@@ -1,7 +1,8 @@
 import {parseHostProps} from './config/loader';
+import {NotificationExtension} from './notification-extension';
+import {EmailSubscription} from 'aws-cdk-lib/aws-sns-subscriptions';
 import {aws_elasticache, CfnParameter, Duration, RemovalPolicy, Stack} from 'aws-cdk-lib';
 import * as sns from 'aws-cdk-lib/aws-sns';
-import * as subs from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import {Construct} from 'constructs';
 import {MiwkeyPublicStackProps} from "./types/stackprops";
@@ -49,7 +50,7 @@ export class MiwkeyPublicStack extends Stack {
 
         const topic = new sns.Topic(this, 'MiwkeyPublicTopic');
 
-        topic.addSubscription(new subs.SqsSubscription(queue));
+        if (props.extension?.alertEmail) topic.addSubscription(new EmailSubscription(props.extension.alertEmail));
 
         const configFs = this.miwkeyEFS(props, subnetSelection);
 
@@ -61,7 +62,7 @@ export class MiwkeyPublicStack extends Stack {
             meilisearchDNSRecord(this, props.mainVpc, props.meilisearchInstance)
         }
 
-        this.miwkeyMainCluster(props, subnetSelection, configFs, mainDatabase, postQueue);
+        this.miwkeyMainCluster(props, subnetSelection, configFs, mainDatabase, postQueue, topic);
     }
 
     private miwkeyEFS(props: MiwkeyPublicStackProps, subnetSelection: SubnetSelection) {
@@ -126,7 +127,7 @@ export class MiwkeyPublicStack extends Stack {
         return postQueue;
     }
 
-    private miwkeyMainCluster(props: MiwkeyPublicStackProps, subnetSelection: SubnetSelection, configFs: FileSystem, mainDatabase: DatabaseInstance, postQueue: CfnCacheCluster) {
+    private miwkeyMainCluster(props: MiwkeyPublicStackProps, subnetSelection: SubnetSelection, configFs: FileSystem, mainDatabase: DatabaseInstance, postQueue: CfnCacheCluster, topic: sns.Topic) {
         const miwkeyMainCluster = new Cluster(this, "miwkeyEcsCluster", {
             containerInsights: true,
             vpc: props.mainVpc
@@ -193,6 +194,7 @@ export class MiwkeyPublicStack extends Stack {
                 spotInstanceDraining: true
             }
         );
+        const extension = props.extension ? new NotificationExtension(this, 'NotificationExtension', props.extension, miwkeyMainCluster, miwkeyMainAsgCapacityProvider, topic) : undefined;
         const mainService = new ApplicationLoadBalancedEc2Service(this, "miwkeyMainService", {
             capacityProviderStrategies: [
                 {
@@ -229,6 +231,9 @@ export class MiwkeyPublicStack extends Stack {
             redirectHTTP: true,
             taskImageOptions: miwkeyMainTaskDefinition()
         });
+        if (extension && (props.extension!.stage === 'client' || props.extension!.stage === 'scheduled')) {
+            extension.configureClient(mainService.taskDefinition, mainService.service, props.extension!);
+        }
         const volumeName = "misskey-config"
         mainService.taskDefinition.addVolume({
             name: volumeName,

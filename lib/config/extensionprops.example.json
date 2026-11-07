@@ -1,0 +1,20 @@
+{
+  "stage": "bootstrap",
+  "fqdn": "REQUIRED_PUBLIC_FQDN",
+  "cloudflareZoneId": "REQUIRED_ZONE_ID",
+  "serviceName": "miwkey-extension",
+  "namespace": "miwkey-internal",
+  "image": "ghcr.io/mi-24v/miwkey-extension@sha256:REQUIRED_PUBLISHED_MANIFEST_DIGEST",
+  "accountEmail": "REQUIRED_ACME_CONTACT",
+  "warningDays": 14,
+  "renewalDays": 30,
+  "staging": true,
+  "budgets": {
+    "mainCpu": "REQUIRED_MEASURED_BUDGET",
+    "mainMemory": "REQUIRED_MEASURED_BUDGET",
+    "extensionCpu": "REQUIRED_MEASURED_BUDGET",
+    "extensionMemory": "REQUIRED_MEASURED_BUDGET",
+    "appCpu": "REQUIRED_MEASURED_BUDGET",
+    "appMemory": "REQUIRED_MEASURED_BUDGET"
+  }
+}

@@ -1,3 +1,4 @@
+import {ExtensionProps} from '../config/loader';
 import {StackProps} from "aws-cdk-lib";
 import {Instance, SecurityGroup, Subnet, SubnetSelection, Vpc} from "aws-cdk-lib/aws-ec2";
 import {ICertificate} from "aws-cdk-lib/aws-certificatemanager";
@@ -6,6 +7,7 @@ import {MiwkeyIp} from "./miwkey-ip";
 
 export interface MiwkeyPublicStackProps extends StackProps{
     hostAmiId: string,
+    extension?: ExtensionProps,
     mainVpc: Vpc,
     mainSubnets: Subnet[]
     defaultSG: SecurityGroup,
