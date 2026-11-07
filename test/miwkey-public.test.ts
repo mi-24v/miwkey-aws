@@ -6,13 +6,15 @@ import * as MiwkeyPublic from '../lib/miwkey-public-stack';
 
 function createTemplate(): Template {
   const app = new cdk.App();
-  const supportStack = new cdk.Stack(app, 'TestSupportStack');
+  const supportStack = new cdk.Stack(app, 'TestSupportStack', {env: {account: '123456789012', region: 'us-east-1'}});
   const vpc = new Vpc(supportStack, 'TestVpc', {
     maxAzs: 2,
     natGateways: 0,
     subnetConfiguration: [{ name: 'test-public', subnetType: SubnetType.PUBLIC }]
   });
   const stack = new MiwkeyPublic.MiwkeyPublicStack(app, 'MyTestStack', {
+    env: {account: '123456789012', region: 'us-east-1'},
+    hostAmiId: 'ami-0123456789abcdef0', // Fixture only, never a production selection.
     mainVpc: vpc,
     mainSubnets: vpc.publicSubnets.map(subnet => subnet as Subnet),
     defaultSG: new SecurityGroup(supportStack, 'TestDefaultSG', { vpc }),
@@ -62,7 +64,7 @@ test('ASG rolls launch template migration while keeping redundant instances', ()
   });
 });
 
-test('ASG uses diversified capacity-optimized Spot pools', () => {
+test('ASG uses diversified pools with room for Service Connect', () => {
   const template = createTemplate();
 
   template.hasResourceProperties('AWS::AutoScaling::AutoScalingGroup', {
@@ -70,16 +72,15 @@ test('ASG uses diversified capacity-optimized Spot pools', () => {
       InstancesDistribution: Match.objectLike({
         OnDemandBaseCapacity: 0,
         OnDemandPercentageAboveBaseCapacity: 0,
-        SpotAllocationStrategy: 'capacity-optimized'
+        SpotAllocationStrategy: 'price-capacity-optimized'
       }),
       LaunchTemplate: Match.objectLike({
         Overrides: Match.arrayEquals([
-          { InstanceType: 't4g.small' },
           { InstanceType: 't4g.medium' },
-          { InstanceType: 'm6g.medium' },
-          { InstanceType: 'm7g.medium' },
-          { InstanceType: 'c6g.medium' },
-          { InstanceType: 'c7g.medium' }
+          { InstanceType: 'm6g.large' },
+          { InstanceType: 'm7g.large' },
+          { InstanceType: 'c6g.large' },
+          { InstanceType: 'c7g.large' }
         ])
       })
     })
@@ -108,4 +109,12 @@ test('ECS keeps all desired tasks healthy during deployments', () => {
       MinimumHealthyPercent: 100
     })
   });
+});
+
+test('host AMI stays pinned until explicit configuration changes', () => {
+  const template = createTemplate();
+  template.hasResourceProperties('AWS::EC2::LaunchTemplate', {
+    LaunchTemplateData: Match.objectLike({ImageId: 'ami-0123456789abcdef0'})
+  });
+  expect(JSON.stringify(template.toJSON().Parameters)).not.toContain('recommended/image_id');
 });

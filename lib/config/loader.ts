@@ -43,3 +43,11 @@ export function loadMeilisearchProps(){
     const rawProps = JSON.parse(fs.readFileSync(path.join(__dirname, ".", "meilisearchprops.json"), {encoding: "utf-8"}))
     return meilisearchPropsSchema.parse(rawProps) as MiwkeyMeilisearchProps
 }
+
+export function parseHostProps(value: unknown): {amiId: string} {
+    return z.object({amiId: z.string().regex(/^ami-(?:[a-f0-9]{8}|[a-f0-9]{17})$/)}).strict().parse(value);
+}
+
+export function loadHostProps(file = path.join(__dirname, 'hostprops.json')): {amiId: string} {
+    return parseHostProps(JSON.parse(fs.readFileSync(file, 'utf8')));
+}

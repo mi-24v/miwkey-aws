@@ -1,3 +1,4 @@
+import {parseHostProps} from './config/loader';
 import {aws_elasticache, CfnParameter, Duration, RemovalPolicy, Stack} from 'aws-cdk-lib';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as subs from 'aws-cdk-lib/aws-sns-subscriptions';
@@ -14,14 +15,12 @@ import {
     PostgresEngineVersion,
     StorageType
 } from "aws-cdk-lib/aws-rds";
-import {InstanceClass, InstanceSize, InstanceType, LaunchTemplate, SubnetSelection, UserData} from "aws-cdk-lib/aws-ec2";
+import {InstanceClass, InstanceSize, InstanceType, LaunchTemplate, SubnetSelection, UserData, MachineImage} from "aws-cdk-lib/aws-ec2";
 import {ApplicationLoadBalancedEc2Service} from "aws-cdk-lib/aws-ecs-patterns";
 import {
-    AmiHardwareType,
     AsgCapacityProvider,
     Cluster,
     ContainerDependencyCondition,
-    EcsOptimizedImage,
     PlacementConstraint,
     PlacementStrategy
 } from "aws-cdk-lib/aws-ecs";
@@ -34,6 +33,7 @@ import {ManagedPolicy, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 export class MiwkeyPublicStack extends Stack {
     constructor(scope: Construct, id: string, props: MiwkeyPublicStackProps) {
         super(scope, id, props);
+        parseHostProps({amiId: props.hostAmiId});
         const databaseUsername = new CfnParameter(this, "rdsUsername", {
             type: "String",
             default: "postgres"
@@ -146,7 +146,7 @@ export class MiwkeyPublicStack extends Stack {
         // ASGのspotPriceプロパティ設定時のみ動作し、mixedInstancesPolicyでは効かないため明示する
         miwkeyAsgUserData.addCommands("echo ECS_ENABLE_SPOT_INSTANCE_DRAINING=true >> /etc/ecs/ecs.config");
         const miwkeyAsgLaunchTemplate = new LaunchTemplate(this, "miwkeyAsgLaunchTemplate", {
-            machineImage: EcsOptimizedImage.amazonLinux2(AmiHardwareType.ARM),
+            machineImage: MachineImage.genericLinux({[this.region]: props.hostAmiId}),
             securityGroup: props.defaultSG,
             role: miwkeyAsgInstanceRole,
             userData: miwkeyAsgUserData
@@ -170,19 +170,17 @@ export class MiwkeyPublicStack extends Stack {
                 mixedInstancesPolicy: {
                     launchTemplate: miwkeyAsgLaunchTemplate,
                     launchTemplateOverrides: [
-                        {instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL)},
                         {instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.MEDIUM)},
-                        {instanceType: InstanceType.of(InstanceClass.M6G, InstanceSize.MEDIUM)},
-                        {instanceType: InstanceType.of(InstanceClass.M7G, InstanceSize.MEDIUM)},
-                        {instanceType: InstanceType.of(InstanceClass.C6G, InstanceSize.MEDIUM)},
-                        {instanceType: InstanceType.of(InstanceClass.C7G, InstanceSize.MEDIUM)}
+                        {instanceType: InstanceType.of(InstanceClass.M6G, InstanceSize.LARGE)},
+                        {instanceType: InstanceType.of(InstanceClass.M7G, InstanceSize.LARGE)},
+                        {instanceType: InstanceType.of(InstanceClass.C6G, InstanceSize.LARGE)},
+                        {instanceType: InstanceType.of(InstanceClass.C7G, InstanceSize.LARGE)}
                     ],
                     instancesDistribution: {
                         onDemandBaseCapacity: 0,
                         onDemandPercentageAboveBaseCapacity: 0, // 100% Spot
-                        // 価格最安の単一プールに寄せるlowest-priceではなく、
-                        // 空き容量に応じてプールを選ぶcapacity-optimizedで在庫枯渇を回避する
-                        spotAllocationStrategy: SpotAllocationStrategy.CAPACITY_OPTIMIZED
+                        // Consider both price and available capacity during planned host replacement.
+                        spotAllocationStrategy: SpotAllocationStrategy.PRICE_CAPACITY_OPTIMIZED
                     }
                 }
             }),

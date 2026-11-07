@@ -4,7 +4,7 @@ import {Environment} from 'aws-cdk-lib';
 import {MiwkeyPublicStack} from '../lib/miwkey-public-stack';
 import {MiwkeyNetworkStack} from "../lib/miwkey-network";
 import {MiwkeyNetworkStackProps} from "../lib/types/stackprops";
-import {loadEnvironment, loadMeilisearchProps, loadNetworkProps} from "../lib/config/loader";
+import {loadEnvironment, loadMeilisearchProps, loadNetworkProps, loadHostProps} from "../lib/config/loader";
 import {MeilisearchInstanceStack} from "../lib/meilisearch/meilisearch-instance";
 
 const app = new cdk.App();
@@ -22,6 +22,7 @@ const meilisearch = new MeilisearchInstanceStack(app, "MiwkeyMeilisearchStack", 
     env: env
 });
 const miwkey = new MiwkeyPublicStack(app, 'MiwkeyPublicStack', {
+    hostAmiId: loadHostProps().amiId,
     mainVpc: network.miwkeyMainVpc,
     mainSubnets: network.miwkeyMainSubnets,
     defaultSG: network.miwkeyDefaultSG,

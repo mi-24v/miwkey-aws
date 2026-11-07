@@ -5,6 +5,7 @@ import {MiwkeyIp} from "./miwkey-ip";
 
 
 export interface MiwkeyPublicStackProps extends StackProps{
+    hostAmiId: string,
     mainVpc: Vpc,
     mainSubnets: Subnet[]
     defaultSG: SecurityGroup,
