@@ -29,7 +29,7 @@ import {ApplicationLoadBalancer, IpAddressType} from "aws-cdk-lib/aws-elasticloa
 import {miwkeyConfigMountPoint, miwkeyMainTaskDefinition, miwkeyMigrationTaskDefinition} from "./taskdef";
 import {AutoScalingGroup, SpotAllocationStrategy, UpdatePolicy} from "aws-cdk-lib/aws-autoscaling";
 import {meilisearchDNSRecord} from "./meilisearch/meilisearch-miwkey";
-import {ManagedPolicy, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
+import {ManagedPolicy, PolicyStatement, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 
 export class MiwkeyPublicStack extends Stack {
     constructor(scope: Construct, id: string, props: MiwkeyPublicStackProps) {
@@ -140,6 +140,13 @@ export class MiwkeyPublicStack extends Stack {
         });
         // AutoScalingGroupPropsのssmSessionPermissionsに相当する権限を明示的に付与する
         miwkeyAsgInstanceRole.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore"));
+        if (props.extension) {
+            // Match the Poll grant verified during Service Connect recovery; see aws/aws-cdk#28594.
+            miwkeyAsgInstanceRole.addToPolicy(new PolicyStatement({
+                actions: ["ecs:Poll"],
+                resources: ["*"]
+            }));
+        }
         // userDataを明示的に持たせないと、addAsgCapacityProviderがECS_CLUSTERを
         // 注入しようとした際に「launch template does not expose its user data」でsynthが失敗する
         const miwkeyAsgUserData = UserData.forLinux();
